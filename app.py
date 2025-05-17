@@ -359,8 +359,8 @@ if uploaded_file:
                      except Exception as e:
                          st.error(f"Error during imputation: {e}")
                          st.exception(e)
-         else:
-              st.info("No missing values found in the uploaded data.")
+             else:
+                 st.info("No missing values found in the uploaded data.")
 
 
         # 2. Visualize Distribution (for numerical columns - using the potentially imputed df)
