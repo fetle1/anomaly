@@ -3,7 +3,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
 # ---------------------------------------------
 # Anomaly detection functions
 # ---------------------------------------------
@@ -221,13 +225,13 @@ def detect_longitudinal_anomalies(df):
 st.set_page_config(page_title="Anomaly Detection App", layout="wide")
 
 # App Title
-st.title("🧠 Anomaly Detection in Health Data")
+st.title(" Anomaly Detection in Health Data")
 
 # App Description
 st.markdown("Upload your health-related CSV file and detect anomalies.")
 
 # Upload CSV file with type selection
-uploaded_file = st.file_uploader("📂 Upload a CSV file", type=["csv"])
+uploaded_file = st.file_uploader(" Upload a CSV file", type=["csv"])
 
 data_type = st.selectbox(
     "Select data type:",
@@ -240,11 +244,11 @@ if uploaded_file:
         df = pd.read_csv(uploaded_file)
 
         # Show preview of data
-        st.subheader("🔍 Preview of Uploaded Data")
+        st.subheader(" Preview of Uploaded Data")
         st.dataframe(df.head())
 
         # 1. Missing Value Analysis
-        st.subheader("📊 Missing Value Analysis")
+        st.subheader(" Missing Value Analysis")
         missing_values = df.isnull().sum()
         missing_percent = (missing_values / len(df)) * 100
         missing_info = pd.DataFrame({'Missing Values': missing_values, 'Percentage (%)': missing_percent})
@@ -268,7 +272,7 @@ if uploaded_file:
 
 
         # 2. Visualize Distribution (for numerical columns)
-        st.subheader("📈 Data Distribution")
+        st.subheader(" Data Distribution")
         numerical_cols = df.select_dtypes(include=['float64', 'int64']).columns
         if len(numerical_cols) > 0:
             selected_col = st.selectbox("Select column to visualize distribution:", numerical_cols)
@@ -278,7 +282,7 @@ if uploaded_file:
             st.info("No numerical columns found for distribution visualization.")
 
         # Anomaly Detection based on data type
-        st.subheader(f"🕵️ Running Anomaly Detection ({data_type})")
+        st.subheader(f" Running Anomaly Detection ({data_type})")
         result_df = df.copy()
         anomaly_locations = []
 
@@ -291,8 +295,8 @@ if uploaded_file:
                 result_df, anomaly_locations = detect_longitudinal_anomalies(df.copy()) # Pass a copy
 
             # Display result table
-            st.success(f"✅ {data_type} Anomaly Detection Completed")
-            st.subheader("📋 Detected Anomalies Summary")
+            st.success(f" {data_type} Anomaly Detection Completed")
+            st.subheader(" Detected Anomalies Summary")
             st.dataframe(result_df)
 
             # 4. Display Specific Anomaly Locations
