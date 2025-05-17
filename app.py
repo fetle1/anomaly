@@ -18,7 +18,7 @@ st.markdown("""
         h1, h2, h3 {color: #003366; font-family: 'Segoe UI', sans-serif;}
         .stButton button {
             background-color: #0066cc;
-            color: white;
+            color: blue;
             font-weight: bold;
             border-radius: 10px;
             padding: 10px 20px;
