@@ -7,7 +7,7 @@ import io
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import LabelEncoder
 import random
-import openai
+
 # Set Streamlit page config
 st.set_page_config(page_title="Health Data Analyzer", layout="wide", page_icon="🧠")
 
@@ -49,41 +49,9 @@ st.markdown("""
 
 # Sidebar menu
 menu = st.sidebar.selectbox(
-    "📌 Hello! what can i do for you",
+    "📌 Hello! what can i do for you?",
     ["Upload Data", "Data Overview", "Missing Data Analysis", "Data Imputation"]
 )
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-elif menu == "🤖 AI Chat Assistant":
-    st.subheader("💬 Ask Me Anything About Anomaly Detection or Health Data Analysis")
-
-    # Get API key (securely)
-    openai.api_key = st.secrets["openai_api_key"]  # Store in .streamlit/secrets.toml
-
-    user_input = st.text_input("You:", placeholder="e.g., What is KNN Imputation?", key="user_input")
-
-    if user_input:
-        st.session_state.chat_history.append(("You", user_input))
-        with st.spinner("Thinking..."):
-            try:
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are an expert in health data analytics and anomaly detection."}
-                    ] + [{"role": "user", "content": q} for _, q in st.session_state.chat_history],
-                    temperature=0.5,
-                )
-                assistant_msg = response["choices"][0]["message"]["content"]
-                st.session_state.chat_history.append(("AI", assistant_msg))
-            except Exception as e:
-                assistant_msg = "⚠️ Error contacting AI: " + str(e)
-                st.session_state.chat_history.append(("AI", assistant_msg))
-
-    for role, msg in st.session_state.chat_history:
-        if role == "You":
-            st.markdown(f"**🧑 {role}:** {msg}")
-        else:
-            st.markdown(f"**🤖 {role}:** {msg}")
 
 # File uploader
 if menu == "Upload Data":
