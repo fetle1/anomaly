@@ -32,19 +32,131 @@ def detect_rule_based_anomalies(df):
                 anomaly_locations.append({'row': index, 'column': 'bp_sys', 'issue': 'Abnormal systolic BP'})
 
         # Rule 3: Missing Values Check
-        if row.isnull().sum() > 0:
-            issues.append("Missing values")
-            for col in df.columns:
-                if pd.isnull(row[col]):
-                    anomaly_locations.append({'row': index, 'column': col, 'issue': 'Missing value'})
-
+        
         # Append the result for this row
         anomalies.append(", ".join(issues) if issues else "Normal")
 
     # Add result column to original dataframe
     df["Rule-Based Result"] = anomalies
     return df, anomaly_locations
+def build_and_train_imputation_network(input_cols, output_cols, complete_data):
+  """
+  Builds and trains a neural network for a specific missing value pattern.
 
+  Args:
+    input_cols (list): List of column names for the input features (non-missing).
+    output_cols (list): List of column names for the output features (missing).
+    complete_data (pd.DataFrame): DataFrame containing only complete cases.
+
+  Returns:
+    tensorflow.keras.models.Sequential: The trained neural network.
+    sklearn.preprocessing.MinMaxScaler: Scaler used for input features.
+    sklearn.preprocessing.MinMaxScaler: Scaler used for output features.
+  """
+  # Ensure columns exist in the complete data
+  if not all(col in complete_data.columns for col in input_cols + output_cols):
+    raise ValueError("Input or output columns not found in the complete dataset.")
+
+  X_train = complete_data[input_cols].values
+  y_train = complete_data[output_cols].values
+
+  # Scale data to 0-1 range
+  input_scaler = MinMaxScaler()
+  output_scaler = MinMaxScaler()
+  X_train_scaled = input_scaler.fit_transform(X_train)
+  y_train_scaled = output_scaler.fit_transform(y_train)
+
+  # Build the neural network
+  model = Sequential()
+  model.add(Dense(64, activation='relu', input_shape=(len(input_cols),)))
+  model.add(Dense(32, activation='relu'))
+  model.add(Dense(len(output_cols), activation='sigmoid')) # Sigmoid for output between 0 and 1
+
+  # Compile and train the model
+  model.compile(optimizer='adam', loss='mse')
+  model.fit(X_train_scaled, y_train_scaled, epochs=100, batch_size=32, verbose=0) # Reduced verbosity
+
+  return model, input_scaler, output_scaler
+
+def impute_missing_values_with_nn(df):
+  """
+  Imputes missing values using trained neural networks for different patterns.
+
+  Args:
+    df (pd.DataFrame): DataFrame with missing values to impute.
+
+  Returns:
+    pd.DataFrame: DataFrame with missing values imputed.
+  """
+  # Step 1: Collect complete cases
+  complete_set = df.dropna().copy()
+
+  # Step 2: Collect incomplete cases
+  incomplete_set = df[df.isnull().any(axis=1)].copy()
+
+  if incomplete_set.empty:
+    print("No missing values to impute.")
+    return df
+
+  # Step 3 & 4: Construct and train networks for each missing pattern
+  trained_networks = {}
+  for index, row in incomplete_set.iterrows():
+    missing_cols = row.index[row.isnull()].tolist()
+    non_missing_cols = row.index[row.notnull()].tolist()
+
+    # Define a pattern key (e.g., sorted tuple of missing columns)
+    pattern_key = tuple(sorted(missing_cols))
+
+    if pattern_key not in trained_networks:
+      print(f"Training network for pattern: missing {pattern_key}, non-missing {tuple(sorted(non_missing_cols))}")
+      try:
+        model, input_scaler, output_scaler = build_and_train_imputation_network(non_missing_cols, missing_cols, complete_set)
+        trained_networks[pattern_key] = {
+            'model': model,
+            'input_scaler': input_scaler,
+            'output_scaler': output_scaler,
+            'input_cols': non_missing_cols,
+            'output_cols': missing_cols
+        }
+      except ValueError as e:
+          print(f"Skipping pattern {pattern_key} due to error: {e}")
+          continue # Skip this pattern if columns are not in complete data
+
+  # Step 5: Use trained networks to impute missing values
+  imputed_df = df.copy()
+  for index, row in incomplete_set.iterrows():
+    missing_cols = row.index[row.isnull()].tolist()
+    non_missing_cols = row.index[row.notnull()].tolist()
+    pattern_key = tuple(sorted(missing_cols))
+
+    if pattern_key in trained_networks:
+      network_info = trained_networks[pattern_key]
+      model = network_info['model']
+      input_scaler = network_info['input_scaler']
+      output_scaler = network_info['output_scaler']
+      network_input_cols = network_info['input_cols']
+      network_output_cols = network_info['output_cols']
+
+      # Ensure input columns match the network's input columns
+      if set(non_missing_cols) == set(network_input_cols):
+          input_data = row[non_missing_cols].values.reshape(1, -1)
+          input_data_scaled = input_scaler.transform(input_data)
+
+          predicted_scaled = model.predict(input_data_scaled)
+          predicted_original_scale = output_scaler.inverse_transform(predicted_scaled)
+
+          # Impute the missing values in the original dataframe copy
+          for i, col in enumerate(missing_cols):
+               # Ensure the column is one of the network's output columns and handle order
+               if col in network_output_cols:
+                    # Find the index of the column in the network's output columns
+                    col_index_in_network_output = network_output_cols.index(col)
+                    imputed_df.loc[index, col] = predicted_original_scale[0, col_index_in_network_output]
+      else:
+          print(f"Input columns for row {index} do not match the trained network's input columns for pattern {pattern_key}. Skipping imputation for this row.")
+
+
+  return imputed_df
 def detect_time_series_anomalies(df):
     """
     Placeholder for time-series anomaly detection.
@@ -139,16 +251,21 @@ if uploaded_file:
         st.dataframe(missing_info[missing_info['Missing Values'] > 0])
 
         # 3. Recommendations for Missing Values (without links)
-        if missing_info['Missing Values'].sum() > 0:
-            st.subheader("💡 Recommendations for Missing Values")
-            st.markdown("""
-            Based on the percentage of missing values, consider these general approaches:
+        if st.button("Impute Missing Values with Neural Networks"):
+            if 'df' in locals(): # Check if df exists from file upload
+                try:
+                    df_imputed = impute_missing_values_with_nn(df.copy())
+                    st.subheader("Data after Imputation")
+                    st.dataframe(df_imputed.head())
+                    # You can then proceed with anomaly detection on df_imputed
+#                   # Update the df variable to the imputed one for subsequent steps
+                    df = df_imputed
+                except Exception as e:
+                    st.error(f"Error during imputation: {e}")
+                    st.exception(e)
+            else:
+                st.warning("Please upload a CSV file first.")
 
-            *   **Low percentage (e.g., < 5%):** Consider simple imputation methods like mean, median, or mode. You might also consider dropping rows with missing values if the dataset is large enough.
-            *   **Moderate percentage (e.g., 5% - 20%):** More sophisticated imputation methods like K-Nearest Neighbors (KNN) imputation or multiple imputation might be suitable. Analyze the nature of missingness (e.g., completely at random, at random, not at random).
-            *   **High percentage (e.g., > 20%):** Imputation becomes less reliable. Consider if the feature is essential. You might need to collect more data or use models that can handle missing values.
-            *   **Before applying any method:** Understand the reason for missingness if possible. Visualization of missing data patterns can be helpful.
-            """)
 
         # 2. Visualize Distribution (for numerical columns)
         st.subheader("📈 Data Distribution")
