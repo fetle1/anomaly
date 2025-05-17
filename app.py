@@ -280,6 +280,12 @@ def impute_missing_values_with_nn(df):
 # Streamlit App UI (Modified)
 # ---------------------------------------------
 # Page configuration
+# ... (previous imports and functions)
+
+# ---------------------------------------------
+# Streamlit App UI
+# ---------------------------------------------
+# Page configuration
 st.set_page_config(page_title="Anomaly Detection App", layout="wide")
 
 # App Title
@@ -288,12 +294,12 @@ st.title(" Anomaly Detection in Health Data")
 # App Description
 st.markdown("Upload your health-related CSV file and detect anomalies.")
 
+# Use session state to store the dataframe
+if 'df' not in st.session_state:
+    st.session_state.df = None
+
 # Upload CSV file with type selection
 uploaded_file = st.file_uploader(" Upload a CSV file", type=["csv"])
-
-# Initialize df in session state if not present
-if 'df' not in st.session_state:
-    st.session_state['df'] = None
 
 data_type = st.selectbox(
     "Select data type:",
@@ -301,119 +307,99 @@ data_type = st.selectbox(
 )
 
 if uploaded_file:
-    # Read uploaded CSV file and store in session state
     try:
-        # Only read if a new file is uploaded or if df is None
-        if st.session_state['df'] is None or uploaded_file.getvalue() != st.session_state['uploaded_file_content']:
-             st.session_state['df'] = pd.read_csv(uploaded_file)
-             st.session_state['uploaded_file_content'] = uploaded_file.getvalue()
-             st.success("File uploaded successfully!")
-
-        df = st.session_state['df'] # Use df from session state
+        # Read uploaded CSV file only if a new file is uploaded
+        if st.session_state.df is None or st.session_state.df.empty:
+             st.session_state.df = pd.read_csv(uploaded_file)
+        # If a new file is uploaded, reset imputation status
+        if uploaded_file is not st.session_state.get('last_uploaded_file'):
+             st.session_state.df = pd.read_csv(uploaded_file)
+             st.session_state.imputed = False
+             st.session_state.last_uploaded_file = uploaded_file
 
         # Show preview of data
         st.subheader(" Preview of Uploaded Data")
-        st.dataframe(df.head())
+        st.dataframe(st.session_state.df.head())
 
-        # 1. Missing Value Analysis
+        # 1. Missing Value Analysis (always on the current state of df)
         st.subheader(" Missing Value Analysis")
-        missing_values = df.isnull().sum()
-        missing_percent = (missing_values / len(df)) * 100
+        missing_values = st.session_state.df.isnull().sum()
+        missing_percent = (missing_values / len(st.session_state.df)) * 100
         missing_info = pd.DataFrame({'Missing Values': missing_values, 'Percentage (%)': missing_percent})
+        st.dataframe(missing_info[missing_info['Missing Values'] > 0])
 
-        missing_info_display = missing_info[missing_info['Missing Values'] > 0]
-        if not missing_info_display.empty:
-             st.dataframe(missing_info_display)
+        # 3. Recommendations for Missing Values (without links)
+        if missing_info['Missing Values'].sum() > 0:
+            st.subheader(" Recommendations for Missing Values")
+            st.markdown("""
+            Based on the percentage of missing values, consider these general approaches:
 
-             # 3. Recommendations for Missing Values
-             st.subheader(" Recommendations for Missing Values")
-             st.markdown("""
-             Based on the percentage of missing values, consider these general approaches:
-
-             *   **Low percentage (e.g., < 5%):** Consider simple imputation methods like mean, median, or mode. You might also consider dropping rows with missing values if the dataset is large enough.
-             *   **Moderate percentage (e.g., 5% - 20%):** More sophisticated imputation methods like K-Nearest Neighbors (KNN) imputation or multiple imputation might be suitable. Analyze the nature of missingness (e.g., completely at random, at random, not at random).
-             *   **High percentage (e.g., > 20%):** Imputation becomes less reliable. Consider if the feature is essential. You might need to collect more data or use models that can handle missing values.
-             *   **Before applying any method:** Understand the reason for missingness if possible. Visualization of missing data patterns can be helpful.
-             """)
-
-             if st.button("Impute Missing Values with Neural Networks and Mode"):
-                 with st.spinner("Imputing missing values..."):
-                     try:
-                         # Update the df in session state after imputation
-                         st.session_state['df'] = impute_missing_values_with_nn(df.copy())
-                         df = st.session_state['df'] # Update local df variable
-                         st.success("Missing values imputed successfully!")
-                         st.subheader("Data after Imputation")
-                         st.dataframe(df.head())
-                         # Re-display missing value analysis after imputation
-                         st.subheader(" Missing Value Analysis After Imputation")
-                         missing_values_after = df.isnull().sum()
-                         missing_percent_after = (missing_values_after / len(df)) * 100
-                         missing_info_after = pd.DataFrame({'Missing Values': missing_values_after, 'Percentage (%)': missing_percent_after})
-                         missing_info_after_display = missing_info_after[missing_info_after['Missing Values'] > 0]
-                         if not missing_info_after_display.empty:
-                              st.dataframe(missing_info_after_display)
-                         else:
-                              st.info("No missing values remaining after imputation.")
-
-                     except Exception as e:
-                         st.error(f"Error during imputation: {e}")
-                         st.exception(e)
-             else:
-                 st.info("No missing values found in the uploaded data.")
+            *   **Low percentage (e.g., < 5%):** Consider simple imputation methods like mean, median, or mode. You might also consider dropping rows with missing values if the dataset is large enough.
+            *   **Moderate percentage (e.g., 5% - 20%):** More sophisticated imputation methods like K-Nearest Neighbors (KNN) imputation or multiple imputation might be suitable. Analyze the nature of missingness (e.g., completely at random, at random, not at random).
+            *   **High percentage (e.g., > 20%):** Imputation becomes less reliable. Consider if the feature is essential. You might need to collect more data or use models that can handle missing values.
+            *   **Before applying any method:** Understand the reason for missingness if possible. Visualization of missing data patterns can be helpful.
+            """)
+            if st.button("Impute Missing Values with Neural Networks"):
+                if st.session_state.df is not None: # Check if df exists
+                    try:
+                        st.session_state.df = impute_missing_values_with_nn(st.session_state.df.copy()) # Impute on a copy and update session state
+                        st.session_state.imputed = True
+                        st.subheader("Data after Imputation")
+                        st.dataframe(st.session_state.df.head())
+                        st.success("Missing values imputed successfully!")
+                    except Exception as e:
+                        st.error(f"Error during imputation: {e}")
+                        st.exception(e)
+                else:
+                    st.warning("Please upload a CSV file first.")
+        elif st.session_state.get('imputed', False):
+             st.info("Missing values have been imputed.")
 
 
-        # 2. Visualize Distribution (for numerical columns - using the potentially imputed df)
+        # 2. Visualize Distribution (for numerical columns) - Use the current state of df
         st.subheader(" Data Distribution")
-        numerical_cols = df.select_dtypes(include=np.number).columns
+        numerical_cols = st.session_state.df.select_dtypes(include=['float64', 'int64']).columns
         if len(numerical_cols) > 0:
             selected_col = st.selectbox("Select column to visualize distribution:", numerical_cols)
-            fig = px.histogram(df, x=selected_col, title=f'Distribution of {selected_col}')
+            fig = px.histogram(st.session_state.df, x=selected_col, title=f'Distribution of {selected_col}')
             st.plotly_chart(fig)
         else:
             st.info("No numerical columns found for distribution visualization.")
 
-        # Anomaly Detection based on data type (using the potentially imputed df)
+        # Anomaly Detection based on data type - Use the current state of df
         st.subheader(f" Running Anomaly Detection ({data_type})")
-        result_df = df.copy() # Start with the current state of the dataframe (potentially imputed)
+        result_df = st.session_state.df.copy() # Start with a copy of the current df
         anomaly_locations = []
 
         if st.button(f"Run Anomaly Detection for {data_type}"):
-            with st.spinner(f"Running {data_type} anomaly detection..."):
-                try:
-                    if data_type == "Cross-Sectional":
-                        result_df, anomaly_locations = detect_rule_based_anomalies(df.copy()) # Pass a copy of the potentially imputed df
-                    elif data_type == "Time-Series":
-                        result_df, anomaly_locations = detect_time_series_anomalies(df.copy()) # Pass a copy
-                    elif data_type == "Longitudinal":
-                        result_df, anomaly_locations = detect_longitudinal_anomalies(df.copy()) # Pass a copy
+            if data_type == "Cross-Sectional":
+                result_df, anomaly_locations = detect_rule_based_anomalies(st.session_state.df.copy()) # Pass a copy
+            elif data_type == "Time-Series":
+                result_df, anomaly_locations = detect_time_series_anomalies(st.session_state.df.copy()) # Pass a copy
+            elif data_type == "Longitudinal":
+                result_df, anomaly_locations = detect_longitudinal_anomalies(st.session_state.df.copy()) # Pass a copy
 
-                    # Display result table
-                    st.success(f" {data_type} Anomaly Detection Completed")
-                    st.subheader(" Detected Anomalies Summary")
-                    st.dataframe(result_df)
+            # Display result table
+            st.success(f" {data_type} Anomaly Detection Completed")
+            st.subheader(" Detected Anomalies Summary")
+            st.dataframe(result_df)
 
-                    # 4. Display Specific Anomaly Locations
-                    if anomaly_locations:
-                        st.subheader(" Specific Anomaly Locations (Row, Column, Issue)")
-                        anomaly_locations_df = pd.DataFrame(anomaly_locations)
-                        st.dataframe(anomaly_locations_df)
-                    else:
-                        st.info("No specific anomalies detected based on the applied methods.")
+            # 4. Display Specific Anomaly Locations
+            if anomaly_locations:
+                st.subheader(" Specific Anomaly Locations (Row, Column, Issue)")
+                anomaly_locations_df = pd.DataFrame(anomaly_locations)
+                st.dataframe(anomaly_locations_df)
+            else:
+                st.info("No specific anomalies detected based on the applied methods.")
 
-
-                    # Allow result download
-                    csv = result_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label=" Download Results as CSV",
-                        data=csv,
-                        file_name=f"{data_type.lower()}_anomalies.csv",
-                        mime="text/csv"
-                    )
-                except Exception as e:
-                    st.error(f"Error during anomaly detection: {e}")
-                    st.exception(e)
-
+            # Allow result download
+            csv = result_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label=" Download Results as CSV",
+                data=csv,
+                file_name=f"{data_type.lower()}_anomalies.csv",
+                mime="text/csv"
+            )
 
     except Exception as e:
         st.error(f" Error processing file: {e}")
