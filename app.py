@@ -11,14 +11,19 @@ import random
 # Set Streamlit page config
 st.set_page_config(page_title="Health Data Analyzer", layout="wide", page_icon="🧠")
 
-# Custom UI Styling
+# Custom UI Styling with gradient background
 st.markdown("""
     <style>
-        .main {background-color: #e6f2ff;}
-        h1, h2, h3 {color: #003366; font-family: 'Segoe UI', sans-serif;}
+        .main {
+            background: linear-gradient(to bottom right, #cce0ff, #e6f2ff);
+        }
+        h1, h2, h3 {
+            color: #003366;
+            font-family: 'Segoe UI', sans-serif;
+        }
         .stButton button {
             background-color: #0066cc;
-            color: blue;
+            color: white;
             font-weight: bold;
             border-radius: 10px;
             padding: 10px 20px;
@@ -81,7 +86,7 @@ if menu == "Data Overview" and "df" in st.session_state:
             df[column].value_counts().plot.pie(autopct='%1.1f%%', ax=ax, colors=sns.color_palette("Pastel1"))
             ax.set_ylabel('')
         else:
-            sns.countplot(y=df[column], ax=ax, palette="Set2")
+            sns.countplot(y=df[column], ax=ax, palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Dark2"]))
 
     st.pyplot(fig)
 
