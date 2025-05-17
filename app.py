@@ -1,5 +1,3 @@
-from IPython import get_ipython
-from IPython.display import display
 # %%
 # app.py
 
