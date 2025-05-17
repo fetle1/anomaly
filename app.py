@@ -112,7 +112,7 @@ def detect_longitudinal_anomalies(df):
 # Neural Network Imputation Functions (Modified)
 # ---------------------------------------------
 
-@st.experimental_singleton # Cache the model training process
+@st.cache_resource # Cache the model training process
 def build_and_train_imputation_network(input_cols, output_cols, complete_data):
   """
   Builds and trains a neural network for a specific missing value pattern.
@@ -190,7 +190,7 @@ def impute_missing_values_with_nn(df):
     st.info("No missing values to impute.")
     return df
 
-  st.subheader("🧠 Imputing Missing Values with Neural Networks and Mode")
+  st.subheader(" Imputing Missing Values with Neural Networks and Mode")
 
   # Train networks for each missing pattern in numerical columns
   trained_networks = {}
