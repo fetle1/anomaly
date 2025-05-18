@@ -1,37 +1,3 @@
 toml
-[theme]
-# A vibrant orange
-primaryColor="#FF5733"
-
-# A light, earthy green for the background
-backgroundColor="#E8F5E9"
-
-# A soft yellow for secondary elements like the sidebar background
-secondaryBackgroundColor="#FFF9C4"
-
-# A dark grey or black for text for good readability against the light background
-textColor="#212121"
-
-# Keep the font readable
-font="sans serif"
-
-# --- Custom styling to reduce borders and create a less structured feel ---
-# This part is experimental and might require some trial and error
-# depending on your specific Streamlit version and elements used.
-# These are general suggestions to try and reduce the appearance of borders.
-
-[global]
-# Potentially reduce element spacing to feel less boxed in (adjust as needed)
- element_spacing = "compact" # Consider trying "compact" or "minimal"
-
-[elements]
-# Try to make input elements look less bordered
- input_border_radius = "0" # Remove rounded corners
-
-[widgets]
-# Style for selectboxes, buttons, etc.
- border_color = "#E0E0E0" # A very light border color
-
-# This section is more for advanced CSS injection, but worth noting
-# You can try to target specific element classes with custom CSS
-# using st.markdown(..., unsafe_allow_html=True) in app.py
+[server]
+fileWatcherType = "none"
