@@ -224,8 +224,9 @@ with tab3:  # Preprocessing
             
                 # Save updated df back to session
                 st.session_state["df_processed"] = df.copy()
-            ue values) converted to category dtype.")
+            st.success("Object columns (excluding identifiers and those with too many unique values) converted to category dtype.")
 
+#thare seems to be a problem this code what should I do and take it as it is 
 
             # Step 4: Drop specified columns
             if columns_to_drop:
