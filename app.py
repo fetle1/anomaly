@@ -50,7 +50,6 @@ with tab1:
 with tab2:
     st.subheader("Data Overview")
 
-    # Section: Upload and Load Data
     if uploaded_file:
         try:
             if uploaded_file.name.endswith('.csv'):
@@ -66,52 +65,44 @@ with tab2:
         except Exception as e:
             st.error(f"Error uploading file: {e}")
 
-    # Only proceed if data is available in session
+    # Only proceed if a DataFrame is available in session
     if "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state.get("df_processed", st.session_state["df"])
+        df = st.session_state.get("df_processed") or st.session_state.get("df")
 
-        st.subheader("Data Preview")
-        st.dataframe(df.head())
+        if df is not None:
+            st.subheader("Data Preview")
+            st.dataframe(df.head())
 
-        st.subheader("Data Types")
-        st.write(df.dtypes)
+            st.subheader("Data Types")
+            st.write(df.dtypes)
 
-        st.subheader("Summary Statistics")
-        st.write(df.describe(include='all'))
+            st.subheader("Summary Statistics")
+            st.write(df.describe(include='all'))
 
-        st.subheader("Column Distribution Visualization")
-        column = st.selectbox("Select a column to visualize", df.columns, key='overview_column_select')
+            st.subheader("Column Distribution Visualization")
+            column = st.selectbox("Select a column to visualize", df.columns, key='overview_column_select')
 
-        if column:
-            color_palette = random.choice(sns.color_palette("Set2", 10))
-            fig, ax = plt.subplots()
-
-            if pd.api.types.is_numeric_dtype(df[column]):
-                sns.histplot(df[column].dropna(), kde=True, ax=ax, color=color_palette)
-                ax.set_title(f'Distribution of {column}')
-                ax.set_xlabel(column)
-                ax.set_ylabel('Frequency')
-
-            elif pd.api.types.is_object_dtype(df[column]) or pd.api.types.is_categorical_dtype(df[column]):
-                series_for_plotting = df[column].dropna().astype(str)
-                if not series_for_plotting.empty:
-                    plt.figure(figsize=(10, max(5, len(series_for_plotting.unique()) * 0.3)))
-                    sns.countplot(y=series_for_plotting, ax=ax,
-                                  palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Pastel2", "viridis", "plasma"]))
-                    ax.set_title(f'Count of {column}')
-                    ax.set_xlabel('Count')
-                    ax.set_ylabel(column)
-                    plt.tight_layout()
+            if column:
+                fig, ax = plt.subplots()
+                if pd.api.types.is_numeric_dtype(df[column]):
+                    sns.histplot(df[column].dropna(), kde=True, ax=ax)
+                    ax.set_title(f'Distribution of {column}')
+                elif pd.api.types.is_object_dtype(df[column]) or pd.api.types.is_categorical_dtype(df[column]):
+                    series = df[column].dropna().astype(str)
+                    if not series.empty:
+                        sns.countplot(y=series, ax=ax)
+                        ax.set_title(f'Count of {column}')
+                    else:
+                        st.warning(f"No non-null values in column '{column}' to plot.")
                 else:
-                    st.warning(f"Column '{column}' has no non-null values to display plot.")
+                    st.info(f"Column '{column}' has a non-visualizable dtype.")
+                st.pyplot(fig)
             else:
-                st.info(f"Column '{column}' has a data type that is not easily visualized with standard plots.")
-
-            st.pyplot(fig)
+                st.info("Please select a column to visualize.")
         else:
-            st.info("Select a column to see its distribution.")
+            st.warning("No valid data to show.")
     else:
-        st.warning("Please upload a dataset first in the 'Upload Data' section.")
+        st.warning("Please upload data first in the 'Upload Data' section.")
 
 with tab3:
     st.subheader("Data Preprocessing")
