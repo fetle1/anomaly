@@ -439,8 +439,8 @@ elif imputation_strategy == "Drop rows with missing values":
 # UI/UX: Add a “Next” Button to Navigate Tabs
 #To avoid scrolling to the top, add a navigation aid at the bottom:
 
-python
-Copy code
+##python
+#Copy code
 col1, col2 = st.columns([8, 2])
 with col2:
     if st.button("➡️ Next: Modeling", key="next_button"):
