@@ -102,7 +102,12 @@ if menu == "Missing Data Analysis" and "df" in st.session_state:
         if df[col].isnull().sum() > 0:
             st.write(f"Column: **{col}**")
             if df[col].dtype in [np.float64, np.int64]:
-                corr = df.corr()[col].drop(col).abs().max()
+                numeric_df = df.select_dtypes(include='number')
+                if col in numeric_df.columns:
+                   corr = numeric_df.corr()[col].drop(col).abs().max()
+                else:
+                    corr = None  # or you can set it to 0 or np.nan depending on your use case
+
                 if corr > 0.3:
                     st.info("Likely MAR (Missing At Random)")
                 else:
