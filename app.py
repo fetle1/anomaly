@@ -8,19 +8,28 @@ from sklearn.impute import KNNImputer
 from sklearn.preprocessing import LabelEncoder
 import random
 import os
+import re # Import regular expressions for cleaning
 
 # Set Streamlit page config
 st.set_page_config(page_title="Health Data Analyzer", layout="wide")
 
-# Custom UI Styling with gradient background
-# Sidebar menu
-menu = st.sidebar.selectbox(
-    " Hello! what can I do for you?",
-    ["Upload Data", "Data Overview", "Data Preprocessing", "Missing Data Analysis", "Data Imputation"]
-)
+# Custom UI Styling (optional, keep it simple for now)
+st.markdown("""
+<style>
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 1.2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# File uploader
-if menu == "Upload Data":
+
+st.title("Health Data Analyzer")
+
+# Use tabs for navigation
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📂 Upload Data", "📊 Data Overview", "🛠️ Data Preprocessing", "🩺 Missing Data Analysis", "💉 Data Imputation"])
+
+
+with tab1:
     st.subheader("Upload your data")
     uploaded_file = st.file_uploader("Upload your dataset (CSV, XLSX)", type=["csv", "xlsx"])
     if uploaded_file:
@@ -29,18 +38,21 @@ if menu == "Upload Data":
                 df = pd.read_csv(uploaded_file)
             elif uploaded_file.name.endswith('.xlsx'):
                 df = pd.read_excel(uploaded_file)
-            st.session_state["df"] = df
+            st.session_state["df"] = df.copy() # Store a copy of the original data
+            st.session_state["df_processed"] = None # Reset processed data on new upload
+            st.session_state["df_imputed"] = None # Reset imputed data on new upload
             st.success(" Data uploaded successfully!")
             st.write("First 5 rows of the uploaded data:")
             st.dataframe(df.head())
         except Exception as e:
             st.error(f"Error uploading file: {e}")
 
-
-# Data Overview
-if menu == "Data Overview":
+with tab2:
+    st.subheader("Data Overview")
     if "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state["df"]
+        df = st.session_state.get("df_processed", st.session_state["df"]) # Prioritize processed data for overview
+        st.info("Displaying data overview for the currently active dataset (processed if available, otherwise original).")
+
         st.subheader(" Data Preview")
         st.dataframe(df.head())
 
@@ -51,120 +63,197 @@ if menu == "Data Overview":
         st.write(df.describe(include='all'))
 
         st.subheader(" Column Distribution Visualization")
-        column = st.selectbox("Select a column to visualize", df.columns)
+        column = st.selectbox("Select a column to visualize", df.columns, key='overview_column_select') # Added a unique key
 
-        color_palette = random.choice(sns.color_palette("Set2", 10))
-        fig, ax = plt.subplots()
+        if column: # Ensure a column is selected
+            color_palette = random.choice(sns.color_palette("Set2", 10))
+            fig, ax = plt.subplots()
 
-        # Check column data type more robustly
-        if pd.api.types.is_numeric_dtype(df[column]):
-            sns.histplot(df[column].dropna(), kde=True, ax=ax, color=color_palette)
-            ax.set_title(f'Distribution of {column}')
-            ax.set_xlabel(column)
-            ax.set_ylabel('Frequency')
-        elif pd.api.types.is_object_dtype(df[column]) or pd.api.types.is_categorical_dtype(df[column]):
-            if df[column].nunique() < 15: # Increased limit for readability
-                # Ensure there are non-null values before plotting pie
-                if not df[column].dropna().empty:
-                    df[column].value_counts().plot.pie(autopct='%1.1f%%', ax=ax, colors=sns.color_palette("Pastel1"))
-                    ax.set_ylabel('')
-                    ax.set_title(f'Distribution of {column}')
+            # Check column data type more robustly
+            if pd.api.types.is_numeric_dtype(df[column]):
+                sns.histplot(df[column].dropna(), kde=True, ax=ax, color=color_palette)
+                ax.set_title(f'Distribution of {column}')
+                ax.set_xlabel(column)
+                ax.set_ylabel('Frequency')
+            elif pd.api.types.is_object_dtype(df[column]) or pd.api.types.is_categorical_dtype(df[column]):
+                # Handle potential non-string data before value_counts
+                series_for_plotting = df[column].dropna().astype(str)
+                if series_for_plotting.nunique() < 20: # Increased limit for readability
+                     # Ensure there are non-null values before plotting pie
+                    if not series_for_plotting.empty:
+                        # Use a count plot for better readability with more categories
+                        plt.figure(figsize=(10, max(5, len(series_for_plotting.unique()) * 0.3))) # Adjust figure size dynamically
+                        sns.countplot(y=series_for_plotting, ax=ax, palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Pastel2", "viridis", "plasma"]))
+                        ax.set_title(f'Count of {column}')
+                        ax.set_xlabel('Count')
+                        ax.set_ylabel(column)
+                        plt.tight_layout() # Adjust layout to prevent labels overlapping
+                    else:
+                        st.warning(f"Column '{column}' has no non-null values to display plot.")
                 else:
-                    st.warning(f"Column '{column}' has no non-null values to display pie chart.")
+                     if not series_for_plotting.empty:
+                        plt.figure(figsize=(10, max(5, len(series_for_plotting.unique()) * 0.2))) # Adjust figure size dynamically
+                        sns.countplot(y=series_for_plotting, ax=ax, palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Pastel2", "viridis", "plasma"]))
+                        ax.set_title(f'Count of {column}')
+                        ax.set_xlabel('Count')
+                        ax.set_ylabel(column)
+                        plt.tight_layout() # Adjust layout to prevent labels overlapping
+                     else:
+                         st.warning(f"Column '{column}' has no non-null values to display plot.")
+
             else:
-                 # Ensure there are non-null values before plotting countplot
-                if not df[column].dropna().empty:
-                    sns.countplot(y=df[column], ax=ax, palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Pastel2", "viridis", "plasma"])) # Added more palettes
-                    ax.set_title(f'Count of {column}')
-                    ax.set_xlabel('Count')
-                    ax.set_ylabel(column)
-                else:
-                     st.warning(f"Column '{column}' has no non-null values to display countplot.")
-        else:
-            st.info(f"Column '{column}' has a data type that is not easily visualized with standard plots.")
+                st.info(f"Column '{column}' has a data type that is not easily visualized with standard plots.")
 
-        st.pyplot(fig)
+            st.pyplot(fig)
+        else:
+             st.info("Select a column to see its distribution.")
+
     else:
         st.warning("Please upload data first in the 'Upload Data' section.")
 
 
-# Data Preprocessing
-if menu == "Data Preprocessing":
+with tab3:
+    st.subheader("Data Preprocessing")
     if "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state["df"].copy() # Work on a copy to avoid modifying the original
+        df = st.session_state["df"].copy() # Start with a fresh copy of the original data
 
-        st.subheader("Data Preprocessing")
-
-        # Handle 'BP' column if it exists and is object type
-        if 'BP' in df.columns and (pd.api.types.is_object_dtype(df['BP']) or pd.api.types.is_string_dtype(df['BP'])):
-            st.write("Processing 'BP' column...")
-            try:
-                # Ensure the 'BP' column is treated as string type first
-                df['BP'] = df['BP'].astype(str)
-
-                # Split the 'BP' column into two new columns: 'Systolic_BP' and 'Diastolic_BP'
-                split_bp = df['BP'].str.split('/', expand=True)
-
-                # Use pd.to_numeric to convert the resulting strings to floating-point numbers
-                df['Systolic_BP'] = pd.to_numeric(split_bp[0], errors='coerce')
-                df['Diastolic_BP'] = pd.to_numeric(split_bp[1], errors='coerce')
-
-                # Drop the original 'BP' column
-                df = df.drop('BP', axis=1)
-                st.success(" 'BP' column split into 'Systolic_BP' and 'Diastolic_BP'")
-            except Exception as e:
-                st.error(f"Error processing 'BP' column: {e}")
-                st.warning("Skipping 'BP' processing due to error.")
-
-        # Identify identifier columns to exclude from categorical conversion
-        identifier_cols = ['clinical_id', 'first_name', 'last_name', 'patient_id'] # Added patient_id as a common identifier
-
-        st.write("Converting suitable object columns to 'category' type...")
-        # Create a new DataFrame without the identifier columns for categorical conversion
-        # .copy() is important
-        df_categorical_subset = df.drop(columns=identifier_cols, errors='ignore').copy()
-
-        # Iterate through the columns of the subset DataFrame
-        for col in df_categorical_subset.columns:
-            # Check if the column's data type is 'object' and not an identifier
-            if pd.api.types.is_object_dtype(df_categorical_subset[col]):
-                # Convert the column to 'category' dtype
-                df[col] = df[col].astype('category') # Apply conversion to the original df
-        st.success("Object columns (excluding identifiers) converted to category dtype.")
-
-        # Optional: Define a list of columns to drop (can be made interactive later)
-        columns_to_drop = st.multiselect("Select columns to drop", df.columns)
-        if columns_to_drop:
-             st.write(f"Dropping columns: {', '.join(columns_to_drop)}")
-             # Drop the specified columns
-             existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
-             df = df.drop(columns=existing_columns_to_drop, errors='ignore')
-             st.success(f"Dropped selected columns.")
-
-
-        st.write("Preprocessing complete. Updated DataFrame head:")
+        st.write("Current Data Head:")
         st.dataframe(df.head())
-        st.write("Updated Data Types:")
+        st.write("Current Data Types:")
         st.write(df.dtypes)
 
-        # Store the processed DataFrame in session state
-        st.session_state["df_processed"] = df
+        # Preprocessing Steps Configuration
+        st.sidebar.subheader("Preprocessing Options")
+        process_bp = st.sidebar.checkbox("Split 'BP' column (e.g., '120/80')", value=True)
+        clean_strings = st.sidebar.checkbox("Clean String Columns (remove spaces, empty strings, etc.)", value=True)
+        convert_to_category = st.sidebar.checkbox("Convert suitable object columns to 'category'", value=True)
+        identifier_cols_input = st.sidebar.text_input("Enter identifier columns (comma-separated)", "clinical_id,first_name,last_name,patient_id")
+        identifier_cols = [col.strip() for col in identifier_cols_input.split(',')]
+        columns_to_drop_input = st.sidebar.text_input("Enter columns to drop (comma-separated)", "")
+        columns_to_drop = [col.strip() for col in columns_to_drop_input.split(',') if col.strip()]
+
+
+        if st.button("Apply Preprocessing"):
+
+            # Step 1: Handle 'BP' column if it exists and is object type
+            if process_bp and 'BP' in df.columns and (pd.api.types.is_object_dtype(df['BP']) or pd.api.types.is_string_dtype(df['BP'])):
+                st.info("Processing 'BP' column...")
+                try:
+                    # Ensure the 'BP' column is treated as string type first
+                    df['BP'] = df['BP'].astype(str).str.strip() # Add strip to remove leading/trailing spaces
+
+                    # Identify rows that can be split
+                    splittable_rows = df['BP'].str.contains('/', na=False)
+
+                    # Split the 'BP' column into two new columns: 'Systolic_BP' and 'Diastolic_BP'
+                    # Apply split only to rows that contain '/'
+                    split_bp = df.loc[splittable_rows, 'BP'].str.split('/', expand=True)
+
+                    # Initialize new columns with NaN
+                    df['Systolic_BP'] = np.nan
+                    df['Diastolic_BP'] = np.nan
+
+                    # Assign split values
+                    if 0 in split_bp.columns:
+                        df.loc[splittable_rows, 'Systolic_BP'] = pd.to_numeric(split_bp[0], errors='coerce')
+                    if 1 in split_bp.columns:
+                         df.loc[splittable_rows, 'Diastolic_BP'] = pd.to_numeric(split_bp[1], errors='coerce')
+
+
+                    # Drop the original 'BP' column
+                    df = df.drop('BP', axis=1)
+                    st.success(" 'BP' column split into 'Systolic_BP' and 'Diastolic_BP'")
+                except Exception as e:
+                    st.error(f"Error processing 'BP' column: {e}")
+                    st.warning("Skipping 'BP' processing due to error.")
+
+            # Step 2: Clean String Columns
+            if clean_strings:
+                st.info("Cleaning string columns...")
+                for col in df.columns:
+                    # Check if the column is of object or category dtype
+                    if pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
+                         try:
+                            # Convert to string first to handle mixed types gracefully
+                            df[col] = df[col].astype(str)
+                            # Remove leading/trailing whitespace
+                            df[col] = df[col].str.strip()
+                            # Replace empty strings with NaN
+                            df[col] = df[col].replace('', np.nan)
+                            # Replace string 'nan' with actual NaN (if it exists as a string)
+                            df[col] = df[col].replace('nan', np.nan)
+                            # Example: Convert to lowercase (optional)
+                            # df[col] = df[col].str.lower()
+                         except Exception as e:
+                            st.warning(f"Could not clean string column '{col}': {e}")
+                st.success("String columns cleaned.")
+
+
+            # Step 3: Convert suitable object columns to 'category' type
+            if convert_to_category:
+                st.info("Converting suitable object columns to 'category' type...")
+                 # Iterate through all columns
+                for col in df.columns:
+                    # Check if the column's data type is 'object' and not in the identifier list
+                    if pd.api.types.is_object_dtype(df[col]) and col not in identifier_cols:
+                        try:
+                             # Check the number of unique values. If not too many, convert to category.
+                             # Threshold can be adjusted (e.g., < 50 or < 100)
+                            if df[col].nunique() < 50:
+                                df[col] = df[col].astype('category')
+                            else:
+                                st.info(f"Column '{col}' has too many unique values ({df[col].nunique()}), skipping conversion to category.")
+                        except Exception as e:
+                             st.warning(f"Could not convert column '{col}' to category: {e}")
+                st.success("Object columns (excluding identifiers and those with too many unique values) converted to category dtype.")
+
+
+            # Step 4: Drop specified columns
+            if columns_to_drop:
+                 st.info(f"Dropping columns: {', '.join(columns_to_drop)}")
+                 existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
+                 if existing_columns_to_drop:
+                    df = df.drop(columns=existing_columns_to_drop, errors='ignore')
+                    st.success(f"Dropped columns: {', '.join(existing_columns_to_drop)}")
+                 else:
+                    st.warning("None of the specified columns to drop were found in the DataFrame.")
+
+
+            st.write("Preprocessing complete. Updated DataFrame head:")
+            st.dataframe(df.head())
+            st.write("Updated Data Types:")
+            st.write(df.dtypes)
+            st.write("Updated Missing Value Count:")
+            st.write(df.isnull().sum())
+
+            # Store the processed DataFrame in session state
+            st.session_state["df_processed"] = df
 
     else:
-        st.warning("Please upload data first in the 'Upload Data' section.")
+        st.warning("Please upload data first in the 'Upload Data' tab.")
 
-# Missing Data Analysis
-if menu == "Missing Data Analysis":
+
+with tab4:
+    st.subheader("Missing Data Analysis")
      # Use df from session state, prioritize processed if available
     if "df_processed" in st.session_state and st.session_state["df_processed"] is not None:
         df = st.session_state["df_processed"]
-        st.subheader(" Missing Data Summary")
+        st.info("Analyzing missing data for the processed dataset.")
+    elif "df" in st.session_state and st.session_state["df"] is not None:
+        df = st.session_state["df"]
+        st.warning("Data has not been preprocessed yet. Displaying missing data analysis for the raw data.")
+    else:
+        st.warning("Please upload data first in the 'Upload Data' tab.")
+        df = None # Ensure df is None if no data is loaded
+
+    if df is not None:
+        st.subheader("📊 Missing Data Summary")
         missing_pct = df.isnull().mean() * 100
         missing_summary = missing_pct[missing_pct > 0].sort_values(ascending=False)
 
         if not missing_summary.empty:
             st.write("Percentage of missing values per column:")
-            st.write(missing_summary)
+            st.dataframe(missing_summary.reset_index().rename(columns={'index': 'Column', 0: 'Missing Percentage (%)'}))
 
             st.subheader(" Missingness Mechanism (Heuristic)")
             st.info("Note: This is a heuristic analysis and requires domain knowledge for definitive determination.")
@@ -195,59 +284,66 @@ if menu == "Missing Data Analysis":
         else:
             st.success("No missing data found in the dataset.")
 
-    elif "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state["df"]
-        st.warning("Data has not been preprocessed yet. Displaying missing data analysis for the raw data.")
-        st.subheader(" Missing Data Summary (Raw Data)")
-        missing_pct = df.isnull().mean() * 100
-        missing_summary = missing_pct[missing_pct > 0].sort_values(ascending=False)
-        if not missing_summary.empty:
-            st.write("Percentage of missing values per column:")
-            st.write(missing_summary)
-        else:
-            st.success("No missing data found in the raw dataset.")
-    else:
-        st.warning("Please upload data first in the 'Upload Data' section.")
 
-
-# Imputation process
-if menu == "Data Imputation":
+with tab5:
+    st.subheader("Data Imputation")
     # Use df from session state, prioritize processed if available
     if "df_processed" in st.session_state and st.session_state["df_processed"] is not None:
         df = st.session_state["df_processed"].copy() # Work on a copy for imputation
-        st.subheader(" Data Imputation")
+        st.info("Applying imputation to the processed dataset.")
 
-        st.write("Starting imputation process...")
+        st.sidebar.subheader("Imputation Options")
+        drop_high_missing_cols = st.sidebar.checkbox("Drop columns with > 50% missing", value=True)
+        drop_low_missing_rows = st.sidebar.checkbox("Drop rows with < 1% missing in a column (if that column has < 5% total missing)", value=True)
+        impute_low_missing = st.sidebar.checkbox("Impute missing < 5% (Mean/Mode)", value=True)
+        impute_moderate_missing = st.sidebar.checkbox("Impute missing 5%-50% (KNN)", value=True)
+        knn_neighbors = st.sidebar.slider("KNN n_neighbors", 2, 10, 5)
 
-        for col in df.columns:
-            missing_pct = df[col].isnull().mean() * 100
-            if missing_pct == 0:
-                continue
 
-            st.write(f" Imputing column: `{col}` ({missing_pct:.1f}% missing)")
+        if st.button("Apply Imputation"):
+            st.write("Starting imputation process...")
+            initial_cols = df.columns.tolist() # Track columns before dropping
 
-            # Strategy 1: Drop column/rows if too much missing data (configurable threshold)
-            if missing_pct > 50: # Example threshold: drop column if > 50% missing
-                 st.warning(f"Column `{col}` has {missing_pct:.1f}% missing values. Dropping the column.")
-                 df = df.drop(col, axis=1)
-                 st.success(f"Dropped column: `{col}`")
-                 continue # Move to the next column
+            for col in initial_cols: # Iterate over initial columns to handle dropped ones
+                 if col not in df.columns: # Skip if column was dropped in a previous step
+                     continue
 
-            # Strategy 2: Drop rows if a small percentage of rows have missing data in a column
-            if missing_pct < 5: # Example threshold: drop rows if < 5% missing in this column
-                 missing_rows_count = df[col].isnull().sum()
-                 # Check if dropping these rows is a significant loss of data (e.g., less than 1% of total rows)
-                 if missing_rows_count / len(df) < 0.01: # Example threshold: drop rows if < 1% of total dataset size
-                      df = df.dropna(subset=[col])
-                      st.warning(f"Dropped {missing_rows_count} rows with missing values in `{col}` (less than 1% of data).")
-                 else:
-                      st.info(f"Column `{col}` has {missing_pct:.1f}% missing. Using imputation method for small missing percentage.")
-                      # Apply imputation for small missing percentage (mean/mode)
+                 missing_pct = df[col].isnull().mean() * 100
+                 if missing_pct == 0:
+                     continue
+
+                 st.write(f" Processing column: `{col}` ({missing_pct:.1f}% missing)")
+
+                 # Strategy 1: Drop column/rows if too much missing data
+                 if drop_high_missing_cols and missing_pct > 50:
+                      st.warning(f"Column `{col}` has {missing_pct:.1f}% missing values. Dropping the column.")
+                      df = df.drop(col, axis=1)
+                      st.success(f"Dropped column: `{col}`")
+                      continue # Move to the next column
+
+                 # Strategy 2: Drop rows if a small percentage of rows have missing data in a column
+                 if drop_low_missing_rows and missing_pct < 5:
+                      missing_rows_count = df[col].isnull().sum()
+                      # Check if dropping these rows is a significant loss of data (e.g., less than 1% of total rows)
+                      if missing_rows_count / len(df) < 0.01:
+                           initial_row_count = len(df)
+                           df = df.dropna(subset=[col])
+                           rows_dropped = initial_row_count - len(df)
+                           if rows_dropped > 0:
+                                st.warning(f"Dropped {rows_dropped} rows with missing values in `{col}` (less than 1% of data).")
+                           else:
+                                st.info(f"No rows dropped for `{col}` despite low missing percentage.")
+                           continue # Move to the next column
+                      else:
+                            st.info(f"Column `{col}` has {missing_pct:.1f}% missing. Proceeding with imputation.")
+
+
+                 # Strategy 3: Impute for small missing percentage (if not dropped rows)
+                 if impute_low_missing and missing_pct < 5 and drop_low_missing_rows == False:
                       if pd.api.types.is_numeric_dtype(df[col]):
                           df[col].fillna(df[col].mean(), inplace=True)
                           st.success(f"Filled missing values in `{col}` with mean.")
                       elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
-                          # Ensure mode exists before filling
                           mode_val = df[col].mode()
                           if not mode_val.empty:
                               df[col].fillna(mode_val[0], inplace=True)
@@ -257,82 +353,82 @@ if menu == "Data Imputation":
                       else:
                            st.warning(f"Imputation strategy not defined for data type of column `{col}` (missing < 5%).")
 
-            # Strategy 3: KNN Imputation for moderate missing percentage
-            else: # Missing percentage is >= 5% and <= 50%
-                 st.info(f"Column `{col}` has {missing_pct:.1f}% missing. Using KNN Imputation.")
-                 if pd.api.types.is_numeric_dtype(df[col]):
-                     try:
-                         imputer = KNNImputer(n_neighbors=5)
-                         # KNNImputer expects a 2D array
-                         df[[col]] = imputer.fit_transform(df[[col]])
-                         st.success(f"Imputed missing values in `{col}` using KNN.")
-                     except Exception as e:
-                         st.error(f"Error during KNN imputation for column `{col}`: {e}")
-                         st.warning(f"Skipping KNN imputation for `{col}`.")
+                 # Strategy 4: KNN Imputation for moderate missing percentage
+                 elif impute_moderate_missing and missing_pct >= 5 and missing_pct <= 50:
+                      st.info(f"Column `{col}` has {missing_pct:.1f}% missing. Using KNN Imputation with k={knn_neighbors}.")
+                      if pd.api.types.is_numeric_dtype(df[col]):
+                          try:
+                              imputer = KNNImputer(n_neighbors=knn_neighbors)
+                              df[[col]] = imputer.fit_transform(df[[col]])
+                              st.success(f"Imputed missing values in `{col}` using KNN.")
+                          except Exception as e:
+                              st.error(f"Error during KNN imputation for column `{col}`: {e}")
+                              st.warning(f"Skipping KNN imputation for `{col}`.")
 
-                 elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
-                     try:
-                         # Convert to string to handle potential NaN and other types during Label Encoding
-                         cat_data = df[col].astype(str)
+                      elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
+                          try:
+                              # Convert to string to handle potential NaN and other types
+                              cat_data = df[col].astype(str)
 
-                         # Handle unseen categories by adding a placeholder before fitting LabelEncoder
-                         # This prevents errors if NaN was the only "unseen" category and it gets imputed to something else
-                         unique_values = cat_data.unique().tolist()
-                         if 'nan' in unique_values: unique_values.remove('nan')
-                         unique_values_for_encoding = unique_values + ['_placeholder_for_knn'] # Add a temporary placeholder
+                              # Handle unseen categories by adding a placeholder before fitting LabelEncoder
+                              unique_values = cat_data.dropna().unique().tolist()
+                              unique_values_for_encoding = unique_values + ['_placeholder_for_knn'] # Add a temporary placeholder
 
-                         le = LabelEncoder()
-                         le.fit(unique_values_for_encoding) # Fit on unique values plus placeholder
+                              le = LabelEncoder()
+                              le.fit(unique_values_for_encoding)
 
-                         # Transform the column (NaN becomes an integer category)
-                         encoded_data = le.transform(cat_data)
+                              encoded_data = le.transform(cat_data)
 
-                         imputer = KNNImputer(n_neighbors=5)
-                         # Reshape for imputer and perform imputation
-                         imputed_encoded_data = imputer.fit_transform(encoded_data.reshape(-1, 1))
+                              imputer = KNNImputer(n_neighbors=knn_neighbors)
+                              imputed_encoded_data = imputer.fit_transform(encoded_data.reshape(-1, 1))
 
-                         # Round imputed values to the nearest integer to match encoded categories
-                         imputed_encoded_data_int = np.round(imputed_encoded_data).flatten().astype(int)
+                              imputed_encoded_data_int = np.round(imputed_encoded_data).flatten().astype(int)
 
-                         # Ensure imputed values are within the range of fitted categories
-                         max_encoded_val = len(le.classes_) - 1
-                         imputed_encoded_data_int = np.clip(imputed_encoded_data_int, 0, max_encoded_val)
+                              # Ensure imputed values are within the range of fitted categories
+                              max_encoded_val = len(le.classes_) - 1
+                              imputed_encoded_data_int = np.clip(imputed_encoded_data_int, 0, max_encoded_val)
 
-                         # Inverse transform to get back the original categories
-                         df[col] = le.inverse_transform(imputed_encoded_data_int)
+                              # Inverse transform
+                              df[col] = le.inverse_transform(imputed_encoded_data_int)
 
-                         # Replace the placeholder back to NaN if it was imputed to that value (unlikely but safe)
-                         df[col] = df[col].replace('_placeholder_for_knn', np.nan)
+                              # Replace the placeholder back to NaN if it was imputed to that value
+                              df[col] = df[col].replace('_placeholder_for_knn', np.nan)
 
-                         st.success(f"Imputed missing values in categorical column `{col}` using Label Encoding and KNN.")
+                              st.success(f"Imputed missing values in categorical column `{col}` using Label Encoding and KNN.")
 
-                     except Exception as e:
-                         st.error(f"Error during categorical imputation for column `{col}`: {e}")
-                         st.warning(f"Skipping categorical imputation for `{col}`.")
+                          except Exception as e:
+                              st.error(f"Error during categorical imputation for column `{col}`: {e}")
+                              st.warning(f"Skipping categorical imputation for `{col}`.")
+                      else:
+                           st.warning(f"Imputation strategy not defined for data type of column `{col}` (missing >= 5% and <= 50%).")
                  else:
-                     st.warning(f"Imputation strategy not defined for data type of column `{col}` (missing >= 5% and <= 50%).")
+                     st.info(f"Column `{col}` ({missing_pct:.1f}% missing) was not imputed based on current settings.")
 
 
-        st.write("Imputation process complete. Checking for remaining missing values:")
-        st.write(df.isnull().sum())
+            st.write("Imputation process complete. Checking for remaining missing values:")
+            remaining_missing = df.isnull().sum()
+            if remaining_missing.sum() == 0:
+                st.success("No missing values remaining after imputation.")
+            else:
+                st.warning("Some missing values may remain depending on imputation strategies applied.")
+                st.write(remaining_missing[remaining_missing > 0])
 
-        # Store the imputed DataFrame in session state
-        st.session_state["df_imputed"] = df
 
-        # Optional: Provide a download link for the imputed data
-        csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
-        csv_string = csv_buffer.getvalue()
-        st.download_button(
-            label="Download Imputed Data (CSV)",
-            data=csv_string,
-            file_name="imputed_data.csv",
-            mime="text/csv"
-        )
+            # Store the imputed DataFrame in session state
+            st.session_state["df_imputed"] = df
+
+            # Provide a download link for the imputed data
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_string = csv_buffer.getvalue()
+            st.download_button(
+                label="Download Imputed Data (CSV)",
+                data=csv_string,
+                file_name="imputed_data.csv",
+                mime="text/csv"
+            )
 
     elif "df" in st.session_state and st.session_state["df"] is not None:
-         st.warning("Please preprocess the data first in the 'Data Preprocessing' section before imputation.")
+         st.warning("Please preprocess the data first in the 'Data Preprocessing' tab before imputation.")
     else:
-        st.warning("Please upload data first in the 'Upload Data' section.")
-
-# empty block at the end for potential future additions or just as a separator
+        st.warning("Please upload data first in the 'Upload Data' tab.")
