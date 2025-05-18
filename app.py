@@ -447,7 +447,7 @@ with col2:
         st.experimental_set_query_params(tab="modeling") 
 
         st.write("Imputation process complete. Checking for remaining missing values:")
-            remaining_missing = df.isnull().sum()
+        remaining_missing = df.isnull().sum()
             if remaining_missing.sum() == 0:
                 st.success("No missing values remaining after imputation.")
             else:
