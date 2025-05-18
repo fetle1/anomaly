@@ -448,11 +448,11 @@ with col2:
 
         st.write("Imputation process complete. Checking for remaining missing values:")
         remaining_missing = df.isnull().sum()
-            if remaining_missing.sum() == 0:
-                st.success("No missing values remaining after imputation.")
-            else:
-                st.warning("Some missing values may remain depending on imputation strategies applied.")
-                st.write(remaining_missing[remaining_missing > 0])
+        if remaining_missing.sum() == 0:
+            st.success("No missing values remaining after imputation.")
+        else:
+            st.warning("Some missing values may remain depending on imputation strategies applied.")
+            st.write(remaining_missing[remaining_missing > 0])
 
 
             # Store the imputed DataFrame in session state
