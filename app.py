@@ -49,11 +49,8 @@ with tab1:
 
 with tab2:
     st.subheader("Data Overview")
-    if "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state.get("df_processed", st.session_state["df"])  # Use processed data if available
-        st.info("Displaying data overview for the currently active dataset (processed if available, otherwise original).")
 
-    st.subheader("Data Preview")
+    # Section: Upload and Load Data
     if uploaded_file:
         try:
             if uploaded_file.name.endswith('.csv'):
@@ -66,14 +63,15 @@ with tab2:
             st.session_state["df_imputed"] = None
             st.success("Data uploaded successfully!")
 
-            st.write("First 5 rows of the uploaded data:")
-            st.dataframe(df.head())
-
         except Exception as e:
             st.error(f"Error uploading file: {e}")
 
+    # Only proceed if data is available in session
     if "df" in st.session_state and st.session_state["df"] is not None:
         df = st.session_state.get("df_processed", st.session_state["df"])
+
+        st.subheader("Data Preview")
+        st.dataframe(df.head())
 
         st.subheader("Data Types")
         st.write(df.dtypes)
@@ -106,7 +104,6 @@ with tab2:
                     plt.tight_layout()
                 else:
                     st.warning(f"Column '{column}' has no non-null values to display plot.")
-
             else:
                 st.info(f"Column '{column}' has a data type that is not easily visualized with standard plots.")
 
@@ -114,8 +111,7 @@ with tab2:
         else:
             st.info("Select a column to see its distribution.")
     else:
-        st.warning("Please upload data first in the 'Upload Data' section.")
-
+        st.warning("Please upload a dataset first in the 'Upload Data' section.")
 
 with tab3:
     st.subheader("Data Preprocessing")
