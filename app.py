@@ -104,8 +104,9 @@ with tab2:
     else:
         st.warning("Please upload data first in the 'Upload Data' section.")
 
-with tab3:
-    st.subheader("Data Preprocessing")
+with tab3:  # Preprocessing
+    st.sidebar.subheader("Preprocessing Options")
+
     if "df" in st.session_state and st.session_state["df"] is not None:
         df = st.session_state["df"].copy() # Start with a fresh copy of the original data
 
@@ -219,7 +220,8 @@ with tab3:
             st.write(df.isnull().sum())
 
             # Store the processed DataFrame in session state
-            st.session_state["df_processed"] = df
+            st.session_state["df_processed"] = processed_df  # after preprocessing is applied
+
 
     else:
         st.warning("Please upload data first in the 'Upload Data' tab.")
@@ -237,6 +239,9 @@ with tab4:
     else:
         st.warning("Please upload data first in the 'Upload Data' tab.")
         df = None # Ensure df is None if no data is loaded
+    if "df_processed" not in st.session_state or st.session_state["df_processed"] is None:
+        st.warning("Please preprocess the data first in the 'Data Preprocessing' tab before imputation.")
+        st.stop()
 
     if df is not None:
         st.subheader("📊 Missing Data Summary")
@@ -277,8 +282,21 @@ with tab4:
             st.success("No missing data found in the dataset.")
 
 
-with tab5:
-    st.subheader("Data Imputation")
+   
+with tab5:  # Imputation
+    st.sidebar.subheader("Imputation Options")
+    # ... only imputation sidebar widgets here ...
+imputation_strategy = st.sidebar.radio(
+    "Choose Imputation Strategy",
+    (
+        "Default Strategy (rules by missing %)",
+        "Mean/Mode for all",
+        "Median/Mode for all",
+        "KNN for all",
+        "Drop rows with missing values"
+    )
+)
+if imputation_strategy == "Default Strategy (rules by missing %)":
     # Use df from session state, prioritize processed if available
     if "df_processed" in st.session_state and st.session_state["df_processed"] is not None:
         df = st.session_state["df_processed"].copy() # Work on a copy for imputation
@@ -395,7 +413,31 @@ with tab5:
                            st.warning(f"Imputation strategy not defined for data type of column `{col}` (missing >= 5% and <= 50%).")
                  else:
                      st.info(f"Column `{col}` ({missing_pct:.1f}% missing) was not imputed based on current settings.")
+elif imputation_strategy == "Mean/Mode for all":
+    for col in df.columns:
+        if df[col].isnull().sum() > 0:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].mean(), inplace=True)
+            else:
+                mode_val = df[col].mode()
+                if not mode_val.empty:
+                    df[col].fillna(mode_val[0], inplace=True)
+elif imputation_strategy == "Median/Mode for all":
+    # same as above, use median instead of mean
+elif imputation_strategy == "KNN for all":
+    imputer = KNNImputer(n_neighbors=knn_neighbors)
+    df = pd.DataFrame(imputer.fit_transform(df.select_dtypes(include=[np.number])), columns=df.select_dtypes(include=[np.number]).columns)
+elif imputation_strategy == "Drop rows with missing values":
+    df = df.dropna()
+# UI/UX: Add a “Next” Button to Navigate Tabs
+#To avoid scrolling to the top, add a navigation aid at the bottom:
 
+python
+Copy code
+col1, col2 = st.columns([8, 2])
+with col2:
+    if st.button("➡️ Next: Modeling", key="next_button"):
+        st.experimental_set_query_params(tab="modeling") 
 
             st.write("Imputation process complete. Checking for remaining missing values:")
             remaining_missing = df.isnull().sum()
