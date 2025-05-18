@@ -50,78 +50,69 @@ with tab1:
 with tab2:
     st.subheader("Data Overview")
     if "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state.get("df_processed", st.session_state["df"]) # Prioritize processed data for overview
+        df = st.session_state.get("df_processed", st.session_state["df"])  # Use processed data if available
         st.info("Displaying data overview for the currently active dataset (processed if available, otherwise original).")
 
-        st.subheader(" Data Preview")
-        if uploaded_file:
-           try:
-              if uploaded_file.name.endswith('.csv'):
-                 df = pd.read_csv(uploaded_file)
-              elif uploaded_file.name.endswith('.xlsx'):
-                 df = pd.read_excel(uploaded_file)
-        st.session_state["df"] = df.copy()
-        st.session_state["df_processed"] = None
-        st.session_state["df_imputed"] = None
-        st.success(" Data uploaded successfully!")
+    st.subheader("Data Preview")
+    if uploaded_file:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            elif uploaded_file.name.endswith('.xlsx'):
+                df = pd.read_excel(uploaded_file)
 
-        st.write("First 5 rows of the uploaded data:")
-        st.dataframe(df.head())  # <-- Safe now because in try block
-    except Exception as e:
-        st.error(f"Error uploading file: {e}")
+            st.session_state["df"] = df.copy()
+            st.session_state["df_processed"] = None
+            st.session_state["df_imputed"] = None
+            st.success("Data uploaded successfully!")
 
-        st.subheader(" Data Types")
+            st.write("First 5 rows of the uploaded data:")
+            st.dataframe(df.head())
+
+        except Exception as e:
+            st.error(f"Error uploading file: {e}")
+
+    if "df" in st.session_state and st.session_state["df"] is not None:
+        df = st.session_state.get("df_processed", st.session_state["df"])
+
+        st.subheader("Data Types")
         st.write(df.dtypes)
 
-        st.subheader(" Summary Statistics")
+        st.subheader("Summary Statistics")
         st.write(df.describe(include='all'))
 
-        st.subheader(" Column Distribution Visualization")
-        column = st.selectbox("Select a column to visualize", df.columns, key='overview_column_select') # Added a unique key
+        st.subheader("Column Distribution Visualization")
+        column = st.selectbox("Select a column to visualize", df.columns, key='overview_column_select')
 
-        if column: # Ensure a column is selected
+        if column:
             color_palette = random.choice(sns.color_palette("Set2", 10))
             fig, ax = plt.subplots()
 
-            # Check column data type more robustly
             if pd.api.types.is_numeric_dtype(df[column]):
                 sns.histplot(df[column].dropna(), kde=True, ax=ax, color=color_palette)
                 ax.set_title(f'Distribution of {column}')
                 ax.set_xlabel(column)
                 ax.set_ylabel('Frequency')
+
             elif pd.api.types.is_object_dtype(df[column]) or pd.api.types.is_categorical_dtype(df[column]):
-                # Handle potential non-string data before value_counts
                 series_for_plotting = df[column].dropna().astype(str)
-                if series_for_plotting.nunique() < 20: # Increased limit for readability
-                     # Ensure there are non-null values before plotting pie
-                    if not series_for_plotting.empty:
-                        # Use a count plot for better readability with more categories
-                        plt.figure(figsize=(10, max(5, len(series_for_plotting.unique()) * 0.3))) # Adjust figure size dynamically
-                        sns.countplot(y=series_for_plotting, ax=ax, palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Pastel2", "viridis", "plasma"]))
-                        ax.set_title(f'Count of {column}')
-                        ax.set_xlabel('Count')
-                        ax.set_ylabel(column)
-                        plt.tight_layout() # Adjust layout to prevent labels overlapping
-                    else:
-                        st.warning(f"Column '{column}' has no non-null values to display plot.")
+                if not series_for_plotting.empty:
+                    plt.figure(figsize=(10, max(5, len(series_for_plotting.unique()) * 0.3)))
+                    sns.countplot(y=series_for_plotting, ax=ax,
+                                  palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Pastel2", "viridis", "plasma"]))
+                    ax.set_title(f'Count of {column}')
+                    ax.set_xlabel('Count')
+                    ax.set_ylabel(column)
+                    plt.tight_layout()
                 else:
-                     if not series_for_plotting.empty:
-                        plt.figure(figsize=(10, max(5, len(series_for_plotting.unique()) * 0.2))) # Adjust figure size dynamically
-                        sns.countplot(y=series_for_plotting, ax=ax, palette=random.choice(["Set1", "Set2", "Set3", "Pastel1", "Pastel2", "viridis", "plasma"]))
-                        ax.set_title(f'Count of {column}')
-                        ax.set_xlabel('Count')
-                        ax.set_ylabel(column)
-                        plt.tight_layout() # Adjust layout to prevent labels overlapping
-                     else:
-                         st.warning(f"Column '{column}' has no non-null values to display plot.")
+                    st.warning(f"Column '{column}' has no non-null values to display plot.")
 
             else:
                 st.info(f"Column '{column}' has a data type that is not easily visualized with standard plots.")
 
             st.pyplot(fig)
         else:
-             st.info("Select a column to see its distribution.")
-
+            st.info("Select a column to see its distribution.")
     else:
         st.warning("Please upload data first in the 'Upload Data' section.")
 
