@@ -175,30 +175,56 @@ with tab3:  # Preprocessing
                             df[col] = df[col].replace('', np.nan)
                             # Replace string 'nan' with actual NaN (if it exists as a string)
                             df[col] = df[col].replace('nan', np.nan)
-                            # Example: Convert to lowercase (optional)
-                            # df[col] = df[col].str.lower()
+                           # Convert to lowercase (optional)
+                            df[col] = df[col].str.lower()
                          except Exception as e:
                             st.warning(f"Could not clean string column '{col}': {e}")
                 st.success("String columns cleaned.")
 
 
             # Step 3: Convert suitable object columns to 'category' type
-            if convert_to_category:
-                st.info("Converting suitable object columns to 'category' type...")
-                 # Iterate through all columns
-                for col in df.columns:
-                    # Check if the column's data type is 'object' and not in the identifier list
-                    if pd.api.types.is_object_dtype(df[col]) and col not in identifier_cols:
-                        try:
-                             # Check the number of unique values. If not too many, convert to category.
-                             # Threshold can be adjusted (e.g., < 50 or < 100)
-                            if df[col].nunique() < 50:
-                                df[col] = df[col].astype('category')
-                            else:
-                                st.info(f"Column '{col}' has too many unique values ({df[col].nunique()}), skipping conversion to category.")
-                        except Exception as e:
-                             st.warning(f"Could not convert column '{col}' to category: {e}")
-                st.success("Object columns (excluding identifiers and those with too many unique values) converted to category dtype.")
+            st.sidebar.markdown("### Convert Variables")
+
+# Only show conversion table for non-identifier columns
+            editable_cols = [col for col in df.columns if col not in identifier_cols]
+            dtype_options = ["int", "float", "object", "category", "bool", "datetime"]
+            
+            # Create 3-column layout in sidebar
+            conversion_table = {}
+            for col in editable_cols:
+                current_dtype = df[col].dtype.name
+                st.sidebar.write(f"**{col}** (current: _{current_dtype}_)")
+                new_dtype = st.sidebar.selectbox(
+                    f"Change `{col}` to:",
+                    options=dtype_options,
+                    key=f"dtype_{col}",
+                    index=dtype_options.index(current_dtype) if current_dtype in dtype_options else 2
+                )
+                conversion_table[col] = new_dtype
+            
+            # Apply button
+            if st.sidebar.button("Apply Type Changes"):
+                for col, new_dtype in conversion_table.items():
+                    try:
+                        if new_dtype == "int":
+                            df[col] = df[col].astype(int)
+                        elif new_dtype == "float":
+                            df[col] = df[col].astype(float)
+                        elif new_dtype == "object":
+                            df[col] = df[col].astype(str)
+                        elif new_dtype == "category":
+                            df[col] = df[col].astype('category')
+                        elif new_dtype == "bool":
+                            df[col] = df[col].astype(bool)
+                        elif new_dtype == "datetime":
+                            df[col] = pd.to_datetime(df[col], errors='coerce')
+                        st.success(f"Converted `{col}` to {new_dtype}.")
+                    except Exception as e:
+                        st.error(f"Failed to convert `{col}` to {new_dtype}: {e}")
+            
+                # Save updated df back to session
+                st.session_state["df_processed"] = df.copy()
+            ue values) converted to category dtype.")
 
 
             # Step 4: Drop specified columns
