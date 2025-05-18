@@ -423,7 +423,14 @@ elif imputation_strategy == "Mean/Mode for all":
                 if not mode_val.empty:
                     df[col].fillna(mode_val[0], inplace=True)
 elif imputation_strategy == "Median/Mode for all":
-    # same as above, use median instead of mean
+    for col in df.columns:
+        if df[col].isnull().sum() > 0:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].median(), inplace=True)
+            else:
+                mode_val = df[col].mode()
+                if not mode_val.empty:
+                    df[col].fillna(mode_val[0], inplace=True)
 elif imputation_strategy == "KNN for all":
     imputer = KNNImputer(n_neighbors=knn_neighbors)
     df = pd.DataFrame(imputer.fit_transform(df.select_dtypes(include=[np.number])), columns=df.select_dtypes(include=[np.number]).columns)
