@@ -26,7 +26,7 @@ st.markdown("""
 st.title("Health Data Analyzer")
 
 # Use tabs for navigation
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📂 Upload Data", "📊 Data Overview", "🛠️ Data Preprocessing", "🩺 Missing Data Analysis", "💉 Data Imputation"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([" Upload Data", " Data Overview", " Data Preprocessing", " Missing Data Analysis", " Data Imputation"])
 
 
 with tab1:
@@ -54,7 +54,21 @@ with tab2:
         st.info("Displaying data overview for the currently active dataset (processed if available, otherwise original).")
 
         st.subheader(" Data Preview")
-        st.dataframe(df.head())
+        if uploaded_file:
+           try:
+              if uploaded_file.name.endswith('.csv'):
+                 df = pd.read_csv(uploaded_file)
+              elif uploaded_file.name.endswith('.xlsx'):
+                 df = pd.read_excel(uploaded_file)
+        st.session_state["df"] = df.copy()
+        st.session_state["df_processed"] = None
+        st.session_state["df_imputed"] = None
+        st.success(" Data uploaded successfully!")
+
+        st.write("First 5 rows of the uploaded data:")
+        st.dataframe(df.head())  # <-- Safe now because in try block
+    except Exception as e:
+        st.error(f"Error uploading file: {e}")
 
         st.subheader(" Data Types")
         st.write(df.dtypes)
