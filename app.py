@@ -9,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 import random
 
 # Set Streamlit page config
-st.set_page_config(page_title="Health Data Analyzer", layout="wide", page_icon="🧠")
+st.set_page_config(page_title="Health Data Analyzer", layout="wide")
 
 # Custom UI Styling with gradient background
 st.markdown("""
@@ -38,7 +38,7 @@ st.markdown("""
 
 # Title with animation
 st.markdown("""
-    <h1 style='animation: fadeInDown 2s;'>🧠 Health Data Analyzer - Preprocessing Module</h1>
+    <h1 style='animation: fadeInDown 2s;'> Health Data Analyzer - Preprocessing Module</h1>
     <style>
     @keyframes fadeInDown {
         from {opacity: 0; transform: translateY(-20px);}
@@ -49,31 +49,31 @@ st.markdown("""
 
 # Sidebar menu
 menu = st.sidebar.selectbox(
-    "📌 Hello! what can i do for you?",
+    " Hello! what can i do for you?",
     ["Upload Data", "Data Overview", "Missing Data Analysis", "Data Imputation"]
 )
 
 # File uploader
 if menu == "Upload Data":
-    uploaded_file = st.file_uploader("📁 Upload your dataset (CSV, XLSX)", type=["csv", "xlsx"])
+    uploaded_file = st.file_uploader("Upload your dataset (CSV, XLSX)", type=["csv", "xlsx"])
     if uploaded_file:
         if uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file)
         else:
             df = pd.read_excel(uploaded_file)
         st.session_state["df"] = df
-        st.success("✅ Data uploaded successfully!")
+        st.success(" Data uploaded successfully!")
 
 # Data Overview
 if menu == "Data Overview" and "df" in st.session_state:
     df = st.session_state["df"]
-    st.subheader("📊 Data Preview")
+    st.subheader(" Data Preview")
     st.dataframe(df.head())
 
-    st.subheader("🧾 Data Types")
+    st.subheader(" Data Types")
     st.write(df.dtypes)
 
-    st.subheader("📈 Column Distribution Visualization")
+    st.subheader(" Column Distribution Visualization")
     column = st.selectbox("Select a column", df.columns)
 
     color_palette = random.choice(sns.color_palette("Set2", 10))
@@ -97,7 +97,7 @@ if menu == "Missing Data Analysis" and "df" in st.session_state:
     missing_pct = df.isnull().mean() * 100
     st.write(missing_pct[missing_pct > 0].sort_values(ascending=False))
 
-    st.subheader("🔍 Missingness Mechanism (Heuristic)")
+    st.subheader(" Missingness Mechanism (Heuristic)")
     for col in df.columns:
         if df[col].isnull().sum() > 0:
             st.write(f"Column: **{col}**")
@@ -120,14 +120,14 @@ if menu == "Data Imputation" and "df" in st.session_state:
     df = st.session_state["df"]
     df_copy = df.copy()
 
-    st.subheader("🧪 Imputing Missing Values...")
+    st.subheader(" Imputing Missing Values...")
 
     for col in df.columns:
         missing_pct = df[col].isnull().mean() * 100
         if missing_pct == 0:
             continue
 
-        st.write(f"🔧 Imputing column: `{col}` ({missing_pct:.1f}% missing)")
+        st.write(f" Imputing column: `{col}` ({missing_pct:.1f}% missing)")
 
         if missing_pct > 50:
             missing_rows = df[col].isnull().sum()
@@ -161,11 +161,11 @@ if menu == "Data Imputation" and "df" in st.session_state:
     st.session_state["df_imputed"] = df_copy
     csv = df_copy.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Download Cleaned Data",
+        label=" Download Cleaned Data",
         data=csv,
         file_name="cleaned_health_data.csv",
         mime='text/csv',
         key="download_button"
     )
 
-    st.success("✅ Imputation complete and dataset saved! Proceed to anomaly detection next.")
+    st.success(" Imputation complete and dataset saved! Proceed to anomaly detection next.")
