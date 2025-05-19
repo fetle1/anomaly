@@ -367,7 +367,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
         if st.button("⬅ Back"):
             st.session_state.active_tab = "Imputation"
         st.markdown('</div>', unsafe_allow_html=True)
-        else:
+    else:
             st.warning("Please upload data first.")
 
         
