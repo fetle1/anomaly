@@ -179,11 +179,13 @@ if st.session_state.active_tab == "Upload":
         st.session_state["df"] = df
         st.success("File uploaded.")
         st.dataframe(df.head())
+
+    # Bottom button container
     st.markdown('<div class="bottom-button-container">', unsafe_allow_html=True)
     col1, col2 = st.columns([1, 5])
     with col2:
         if st.button("Next ➡"):
-           st.session_state.active_tab = "Preprocessing"
+            st.session_state.active_tab = "Preprocessing"
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Preprocessing Tab
