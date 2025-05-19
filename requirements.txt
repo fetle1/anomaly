@@ -2,8 +2,7 @@ streamlit
 pandas
 numpy
 scikit-learn
-plotly
-tensorflow
-matplotlib
-seaborn
-scipy
+rich
+markdown-it-py
+mdurl
+pygments
