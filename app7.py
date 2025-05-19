@@ -38,9 +38,9 @@ def local_css():
         div.stButton > button {
             background-color: #003366;
             color: white;
-            font-size: 1rem;
-            padding: 0.6em 1.5em;
-            border-radius: 10px;
+            font-size: 1.2rem;
+            padding: 0.8em 2em;
+            border-radius: 12px;
             font-weight: bold;
         }
         div.stButton > button:hover {
@@ -102,9 +102,9 @@ def T(key):
     return translations.get(key, {}).get(lang, key)
 
 # -----------------------------
-# Utility Functions (keep existing)
+# Utility Functions Placeholder
 # -----------------------------
-# [... existing functions remain unchanged ...]
+# (Integrate your functional code here)
 
 # -----------------------------
 # Streamlit UI Logic
@@ -122,4 +122,4 @@ tabs = [T("Upload"), T("Preprocessing"), T("Missing Data Analysis"), T("Anomaly 
 tab_selection = st.sidebar.radio("Navigation", tabs)
 st.session_state.active_tab = tab_selection
 
-# Update the tab-specific content below accordingly...
+# Update the tab-specific content logic in other cells as needed
