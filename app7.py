@@ -349,26 +349,31 @@ elif st.session_state.active_tab == "Missing Data Analysis":
 # Modeling Tab
 elif st.session_state.active_tab == T("Anomaly Detection"):
     st.subheader(T("Anomaly Detection"))
-    if "df" in st.session_state:
-        df = st.session_state.df.copy()
+
+    if "data" in st.session_state:
+        df = st.session_state.data.copy()
+
+        # Run rule-based anomaly detection
         anomalies = detect_rule_based_anomalies(df)
-        st.session_state.anomalies = anomalies
-        anomaly_count = anomalies.sum()
-        if anomaly_count == 0:
-            st.success(T("No anomalies"))
+
+        anomaly_df = df[anomalies]
+        st.write(anomaly_df)
+
+        count = anomalies.sum()
+        if count > 0:
+            st.success(T("Anomalies found").format(count))
+            csv = anomaly_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label=T("Download"),
+                data=csv,
+                file_name='anomalies.csv',
+                mime='text/csv'
+            )
         else:
-            st.error(T("Anomalies found").format(anomaly_count))
-            st.write(df[anomalies])
-            csv_anomalies = io.StringIO()
-            anomaly_df.to_csv(csv_anomalies, index=False)
-            st.download_button(" Download Anomalies", data=csv_anomalies.getvalue(), file_name="anomalies.csv", mime="text/csv")
-    
-        st.markdown('<div class="bottom-button-container">', unsafe_allow_html=True)
-        if st.button("⬅ Back"):
-            st.session_state.active_tab = "Imputation"
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.info(T("No anomalies"))
+
     else:
-            st.warning("Please upload data first.")
+        st.warning("⚠ Please upload and preprocess data first.")
 
         
 
