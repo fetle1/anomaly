@@ -196,14 +196,14 @@ def detect_rule_based_anomalies(df):
     def col_exists(*cols):
         return all(col in df.columns for col in cols)
 
-    if col_exists('hgb'):
-        anomalies |= df['hgb'] < 0
+    if col_exists('hemoglobin'):
+        anomalies |= df['hemoglobin'] <= 0
 
     if col_exists('glucose'):
-        anomalies |= df['glucose'] < 0
+        anomalies |= df['glucose'] <= 0
 
     if col_exists('spo2'):
-        anomalies |= df['spo2'] < 0
+        anomalies |= df['spo2'] <= 0
 
     if col_exists('systolic', 'dystolic'):
         anomalies |= df['dystolic'] > df['systolic']
