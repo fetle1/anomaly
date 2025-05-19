@@ -5,6 +5,8 @@ import io
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import LabelEncoder
 
+st.set_page_config(page_title="Health Data Imputation App", layout="wide")
+
 # -----------------------------
 # Inject CSS for Custom Styling
 # -----------------------------
@@ -155,7 +157,6 @@ def apply_default_strategy(df, options):
 # -----------------------------
 # Streamlit UI Logic
 # -----------------------------
-st.set_page_config(page_title="Health Data Imputation App", layout="wide")
 st.title("Digital Health Missing Data Imputation")
 
 if "active_tab" not in st.session_state:
