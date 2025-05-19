@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 # -----------------------------
 # Set Page Configuration First
 # -----------------------------
-st.set_page_config(page_title="Health Data Imputation App", layout="wide")
+st.set_page_config(page_title="TafitiX", layout="wide")
 
 # -----------------------------
 # Inject CSS for Custom Styling
@@ -155,7 +155,7 @@ def apply_default_strategy(df, options):
 # Streamlit UI Logic
 # -----------------------------
 
-st.title("Digital Health Missing Data Imputation")
+st.title("TafitiX")
 
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "Upload"
@@ -163,7 +163,7 @@ if "active_tab" not in st.session_state:
 breadcrumb = f"You are here: ➤ <span>{st.session_state.active_tab}</span>"
 st.markdown(f'<div class="breadcrumb">{breadcrumb}</div>', unsafe_allow_html=True)
 
-tabs = ["Upload", "Preprocessing", "Imputation", "Modeling"]
+tabs = ["Upload", "Preprocessing", "Missing Data Analysis", "Anomaly Detection"]
 tab_selection = st.sidebar.radio("Navigation", tabs)
 st.session_state.active_tab = tab_selection
 
@@ -197,7 +197,7 @@ elif st.session_state.active_tab == "Preprocessing":
             st.markdown(f"- {change}")
         st.dataframe(df.head())
 
-        with st.expander("🔧 Advanced: Drop or Convert Columns"):
+        with st.expander("Advanced: Drop or Convert Columns"):
             identifier_cols = st.text_input("Enter comma-separated identifier columns to exclude temporarily")
             drop_cols = st.multiselect("Select columns to drop", df.columns)
             convert_cols = st.multiselect("Select columns to convert to numeric", df.columns)
@@ -215,11 +215,11 @@ elif st.session_state.active_tab == "Preprocessing":
             st.session_state.active_tab = "Upload"
     with col2:
         if st.button("Next ➡"):
-            st.session_state.active_tab = "Imputation"
+            st.session_state.active_tab = "Missing Data Analysis"
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Imputation Tab
-elif st.session_state.active_tab == "Imputation":
+elif st.session_state.active_tab == "Missing Data Analysis":
     if "df_processed" not in st.session_state:
         st.warning("Preprocess your data first.")
     else:
@@ -251,7 +251,7 @@ elif st.session_state.active_tab == "Imputation":
 
         csv_buffer = io.StringIO()
         df.to_csv(csv_buffer, index=False)
-        st.download_button("📥 Download Imputed Data", data=csv_buffer.getvalue(), file_name="imputed_data.csv", mime="text/csv")
+        st.download_button(" Download Imputed Data", data=csv_buffer.getvalue(), file_name="imputed_data.csv", mime="text/csv")
 
     st.markdown('<div class="bottom-button-container">', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
@@ -260,12 +260,12 @@ elif st.session_state.active_tab == "Imputation":
             st.session_state.active_tab = "Preprocessing"
     with col2:
         if st.button("Next ➡"):
-            st.session_state.active_tab = "Modeling"
+            st.session_state.active_tab = "Anomaly Detection"
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Modeling Tab
-elif st.session_state.active_tab == "Modeling":
-    st.info("Modeling features coming soon. You can export and use imputed data.")
+elif st.session_state.active_tab == "Anomaly Detection":
+    st.info("Anomaly Detection features coming soon. You can export and use imputed data.")
     if "df_imputed" in st.session_state:
         st.dataframe(st.session_state["df_imputed"].head())
 
