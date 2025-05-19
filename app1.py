@@ -13,56 +13,94 @@ def local_css():
     st.markdown(
         """
         <style>
-        /* Background gradient */
+        /* App background with AI + Health image and gradient overlay */
         .stApp {
-            background: linear-gradient(135deg, #f0f4f8, #d9e2ec);
+            background: linear-gradient(rgba(240, 244, 248, 0.85), rgba(217, 226, 236, 0.9)),
+                        url('https://images.unsplash.com/photo-1588776814546-5ae1d9c57f0f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
             color: #0f172a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        /* Sidebar background */
+
+        /* Sidebar background - light blue with white text */
         [data-testid="stSidebar"] {
-            background-color: #334e68;
+            background-color: #cce4f6 !important;
+            color: white !important;
+        }
+
+        /* Sidebar labels and text */
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] .stRadio > label,
+        [data-testid="stSidebar"] .css-1v0mbdj,
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: white !important;
+        }
+
+        /* Sidebar buttons - larger and styled */
+        [data-testid="stSidebar"] div.stButton > button {
+            background-color: #1e3a8a;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 0.7em 1.6em;
+            margin-top: 10px;
+            border: none;
+            width: 100%;
+            transition: background-color 0.3s ease;
+        }
+
+        [data-testid="stSidebar"] div.stButton > button:hover {
+            background-color: #3b82f6;
             color: white;
         }
-        /* Sidebar radio button text */
-        [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stRadio > label {
-            color: white;
-        }
-        /* Buttons */
+
+        /* Main buttons */
         div.stButton > button {
-            background-color: #1e40af;
+            background-color: #1e3a8a;
             color: white;
             border-radius: 8px;
-            padding: 0.5em 1.2em;
+            padding: 0.6em 1.4em;
             font-weight: 600;
             border: none;
             transition: background-color 0.3s ease;
         }
+
         div.stButton > button:hover {
             background-color: #3b82f6;
             color: white;
         }
-        /* Container for bottom buttons */
+
+        /* Bottom navigation buttons container */
         .bottom-button-container {
             display: flex;
             justify-content: flex-end;
-            gap: 0.5em;
+            gap: 0.75em;
             margin-top: 2rem;
             margin-bottom: 2rem;
         }
+
         /* Breadcrumb style */
         .breadcrumb {
-            font-size: 0.9rem;
+            font-size: 1rem;
             margin-bottom: 1rem;
             color: #64748b;
-        }
-        .breadcrumb span {
             font-weight: 600;
+        }
+
+        .breadcrumb span {
+            font-weight: 700;
             color: #1e40af;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
 
 # -----------------------------
 # Utility Functions
@@ -161,7 +199,7 @@ def map_sex_values(df, col):
         st.warning(f"Column `{col}` not found for sex mapping.")
         return df
     mapping = {
-        "male": "Male", "m": "Male", "man": "Male", "boy": "Male",
+        "male": "Male", "m": "Male", "man": "Male", "boy": "Male","M":"Male"
         "female": "Female", "f": "Female", "woman": "Female", "women": "Female", "girl": "Female"
     }
     df[col] = df[col].astype(str).str.lower().map(lambda x: mapping.get(x, x)).replace({"male":"Male","female":"Female"})
@@ -205,7 +243,7 @@ def drop_columns(df, cols_to_drop):
 # Navigation and Breadcrumbs
 # -----------------------------
 
-tabs = ["Upload Data", "Data Preprocessing", "Imputation", "Modeling"]
+tabs = ["Upload Data", "Data Preprocessing", "Missing value analysis", "Anomaly detection"]
 
 def show_breadcrumb(active_tab):
     crumbs = []
@@ -230,9 +268,9 @@ def go_prev_tab():
 # Streamlit App Setup
 # -----------------------------
 
-st.set_page_config(page_title="Data Imputation App", layout="wide")
+st.set_page_config(page_title="Health Anomaly detector", layout="wide")
 local_css()
-st.title("Data Imputation App")
+st.title("Health Anomaly detector")
 
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "Upload Data"
@@ -360,8 +398,8 @@ elif st.session_state.active_tab == "Data Preprocessing":
 # -----------------------------
 # Tab: Imputation
 # -----------------------------
-elif st.session_state.active_tab == "Imputation":
-    st.header("Imputation Strategies")
+elif st.session_state.active_tab == "Missing data analysis":
+    st.header("Missing data analysis")
 
     if st.session_state.df_processed is None:
         st.warning("Please preprocess data first.")
@@ -421,7 +459,7 @@ elif st.session_state.active_tab == "Imputation":
         st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------
-# Tab: Modeling (Placeholder)
+# Tab: Anomaly detector (Placeholder)
 # -----------------------------
 elif st.session_state.active_tab == "Modeling":
     st.header("Modeling / Analysis")
