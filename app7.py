@@ -192,55 +192,39 @@ def apply_default_strategy(df, options):
 
 def detect_rule_based_anomalies(df):
     anomalies = pd.Series([False] * len(df), index=df.index)
-    reasons = [[] for _ in range(len(df))]
-
-    def add_reason(idx, reason):
-        reasons[idx].append(reason)
 
     def col_exists(*cols):
         return all(col in df.columns for col in cols)
 
-    for idx, row in df.iterrows():
-        if col_exists('hgb') and pd.notna(row['hgb']) and row['hgb'] < 0:
-            anomalies[idx] = True
-            add_reason(idx, 'Negative hemoglobin (hgb)')
-        if col_exists('glucose') and pd.notna(row['glucose']) and row['glucose'] < 0:
-            anomalies[idx] = True
-            add_reason(idx, 'Negative glucose')
-        if col_exists('spo2') and pd.notna(row['spo2']) and row['spo2'] < 0:
-            anomalies[idx] = True
-            add_reason(idx, 'Negative oxygen saturation (spo2)')
-        if col_exists('systolic', 'dystolic') and pd.notna(row['systolic']) and pd.notna(row['dystolic']) and row['dystolic'] > row['systolic']:
-            anomalies[idx] = True
-            add_reason(idx, 'Dystolic > Systolic')
-        if col_exists('sex', 'pregnant') and pd.notna(row['sex']) and row['sex'].lower() == 'male' and row['pregnant']:
-            anomalies[idx] = True
-            add_reason(idx, 'Male marked as pregnant')
-        if col_exists('sex', 'bph') and pd.notna(row['sex']) and row['sex'].lower() == 'female' and row['bph']:
-            anomalies[idx] = True
-            add_reason(idx, 'Female marked with BPH')
-        if col_exists('age', 'pregnant') and pd.notna(row['age']) and row['pregnant']:
-            if row['age'] < 5:
-                anomalies[idx] = True
-                add_reason(idx, 'Pregnant under age 5')
-            if row['age'] > 70:
-                anomalies[idx] = True
-                add_reason(idx, 'Pregnant over age 70')
-        if col_exists('dob', 'dod'):
-            dob = pd.to_datetime(row['dob'], errors='coerce')
-            dod = pd.to_datetime(row['dod'], errors='coerce')
-            if pd.notna(dob) and pd.notna(dod) and dob > dod:
-                anomalies[idx] = True
-                add_reason(idx, 'DOB after DOD')
-        if col_exists('admission_date', 'discharge_date'):
-            adm = pd.to_datetime(row['admission_date'], errors='coerce')
-            dis = pd.to_datetime(row['discharge_date'], errors='coerce')
-            if pd.notna(adm) and pd.notna(dis) and dis < adm:
-                anomalies[idx] = True
-                add_reason(idx, 'Discharge before admission')
+    if col_exists('hgb'):
+        anomalies |= df['hgb'] < 0
 
-    return anomalies, reasons
+    if col_exists('glucose'):
+        anomalies |= df['glucose'] < 0
 
+    if col_exists('spo2'):
+        anomalies |= df['spo2'] < 0
+
+    if col_exists('systolic', 'dystolic'):
+        anomalies |= df['dystolic'] > df['systolic']
+
+    if col_exists('sex', 'pregnant'):
+        anomalies |= (df['sex'].str.lower() == 'male') & (df['pregnant'] == True)
+
+    if col_exists('sex', 'bph'):
+        anomalies |= (df['sex'].str.lower() == 'female') & (df['bph'] == True)
+
+    if col_exists('age', 'pregnant'):
+        anomalies |= (df['age'] < 5) & (df['pregnant'] == True)
+        anomalies |= (df['age'] > 70) & (df['pregnant'] == True)
+
+    if col_exists('dob', 'dod'):
+        anomalies |= pd.to_datetime(df['dob'], errors='coerce') > pd.to_datetime(df['dod'], errors='coerce')
+
+    if col_exists('admission_date', 'discharge_date'):
+        anomalies |= pd.to_datetime(df['discharge_date'], errors='coerce') < pd.to_datetime(df['admission_date'], errors='coerce')
+
+    return anomalies
 # -----------------------------
 # Streamlit UI Logic
 st.title("TafitiX")
@@ -363,26 +347,30 @@ elif st.session_state.active_tab == "Missing Data Analysis":
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Modeling Tab
-elif st.session_state.active_tab == "Anomaly Detection":
-    st.info("Modeling features coming soon. You can export and use imputed data.")
-    if "df_imputed" in st.session_state:
-        df = st.session_state["df_imputed"]
-        anomalies, reasons = detect_rule_based_anomalies(df)
-        anomaly_df = df[anomalies].copy()
-        anomaly_df['Anomaly Reason'] = ["; ".join(r) for r in reasons if r]
+elif st.session_state.active_tab == T("Anomaly Detection"):
+    st.subheader(T("Anomaly Detection"))
+    if "df" in st.session_state:
+        df = st.session_state.df.copy()
+        anomalies = detect_rule_based_anomalies(df)
+        st.session_state.anomalies = anomalies
+        anomaly_count = anomalies.sum()
+        if anomaly_count == 0:
+            st.success(T("No anomalies"))
+        else:
+            st.error(T("Anomalies found").format(anomaly_count))
+            st.write(df[anomalies])
+            csv_anomalies = io.StringIO()
+            anomaly_df.to_csv(csv_anomalies, index=False)
+            st.download_button(" Download Anomalies", data=csv_anomalies.getvalue(), file_name="anomalies.csv", mime="text/csv")
+    
+        st.markdown('<div class="bottom-button-container">', unsafe_allow_html=True)
+        if st.button("⬅ Back"):
+            st.session_state.active_tab = "Imputation"
+        st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.warning("Please upload data first.")
 
-        st.markdown("##  Rule-Based Anomaly Detection")
-        st.write(f"Total anomalies detected: {anomalies.sum()}")
-        st.dataframe(anomaly_df)
-
-        csv_anomalies = io.StringIO()
-        anomaly_df.to_csv(csv_anomalies, index=False)
-        st.download_button(" Download Anomalies", data=csv_anomalies.getvalue(), file_name="anomalies.csv", mime="text/csv")
-
-    st.markdown('<div class="bottom-button-container">', unsafe_allow_html=True)
-    if st.button("⬅ Back"):
-        st.session_state.active_tab = "Imputation"
-    st.markdown('</div>', unsafe_allow_html=True)
+        
 
 # -----------------------------
 # Streamlit UI Logic
