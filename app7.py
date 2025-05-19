@@ -360,18 +360,20 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
         st.write(anomaly_df)
 
         count = anomalies.sum()
+        elif st.session_state.active_tab == T("Anomaly Detection"):
+    if "data" in st.session_state:
+        df = st.session_state.data.copy()
+        anomalies = detect_rule_based_anomalies(df)
+        anomaly_df = df[anomalies]
+        count = anomalies.sum()
+
         if count > 0:
             st.success(T("Anomalies found").format(count))
+            st.write(anomaly_df)
             csv = anomaly_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label=T("Download"),
-                data=csv,
-                file_name='anomalies.csv',
-                mime='text/csv'
-            )
+            st.download_button(label=T("Download"), data=csv, file_name='anomalies.csv', mime='text/csv')
         else:
             st.info(T("No anomalies"))
-
     else:
         st.warning("⚠ Please upload and preprocess data first.")
 
