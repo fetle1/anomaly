@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
-
+import tensorflow
 
 # Optional visualization libraries
 import matplotlib.pyplot as plt
@@ -208,7 +208,7 @@ if st.session_state.active_tab == T("Upload"):
         df = pd.read_csv(uploaded_file)
         st.session_state["df"] = df
         st.success("File uploaded.")
-        st.dataframe(df.head())
+        st.dataframe(df.head(10))
 
     st.markdown('<div class="bottom-button-container">', unsafe_allow_html=True)
     col1, col2 = st.columns([1, 5])
@@ -230,7 +230,7 @@ elif st.session_state.active_tab == T("Preprocessing"):
             st.write("Changes made:")
             for change in changes:
                 st.markdown(f"- {change}")
-            st.dataframe(df.head())
+            st.dataframe(df.head(10))
 
         with st.expander("Advanced: Drop or Convert Columns"):
             identifier_cols = st.text_input("Enter comma-separated identifier columns to exclude temporarily")
