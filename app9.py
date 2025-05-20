@@ -378,99 +378,84 @@ elif st.session_state.active_tab == T("Missing Data Analysis"):
 
 # Anomaly Detection Tab
 # Anomaly Detection Tab
-elif st.session_state.active_tab == T("Anomaly Detection"):
-    st.subheader(T("Anomaly Detection"))
+elif method == "Autoencoder":
+    batch_size = 32
+    dropout_rate = 0.0
+    encoding_dim = 16
+    epochs = 20
 
-    if "df_imputed" not in st.session_state:
-        st.warning("⚠ Please preprocess and impute your data first.")
-    else:
-        df = st.session_state["df_imputed"].copy()
-        method = st.radio("Choose Detection Method", ["Rule-Based", "Autoencoder"], horizontal=True)
+    # Scale data and train autoencoder
+    from sklearn.preprocessing import StandardScaler
+    from tensorflow.keras.models import Model
+    from tensorflow.keras.layers import Input, Dense, Dropout
+    import tensorflow as tf
 
-        if method == "Rule-Based":
-            anomalies = detect_rule_based_anomalies(df)
-            count = anomalies.sum()
-            st.markdown(f"### 🔍 {count} anomalies detected by Rule-Based method.")
+    # Filter numeric columns only
+    numeric_cols = df.select_dtypes(include='number').columns
+    df_numeric = df[numeric_cols].dropna()
 
-        elif method == "Autoencoder":
-            batch_size = 32
-            dropout_rate = 0.0
-            encoding_dim = 16
-            epochs = 20
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(df_numeric)
 
-        # Scale data and train autoencoder
-        from sklearn.preprocessing import StandardScaler
-        from tensorflow.keras.models import Model
-        from tensorflow.keras.layers import Input, Dense, Dropout
-        import tensorflow as tf
+    input_dim = X_scaled.shape[1]
+    input_layer = Input(shape=(input_dim,))
+    encoded = Dense(encoding_dim, activation='relu')(input_layer)
+    if dropout_rate > 0:
+        encoded = Dropout(dropout_rate)(encoded)
+    decoded = Dense(input_dim, activation='linear')(encoded)
 
-        # Filter numeric columns only
-        numeric_cols = df.select_dtypes(include='number').columns
-        df_numeric = df[numeric_cols].dropna()
+    autoencoder = Model(inputs=input_layer, outputs=decoded)
+    autoencoder.compile(optimizer='adam', loss='mse')
+    autoencoder.fit(X_scaled, X_scaled, epochs=epochs, batch_size=batch_size, shuffle=True, verbose=0)
 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(df_numeric)
-        encoding_dim = 16 
-        input_dim = X_scaled.shape[1]
-        input_layer = Input(shape=(input_dim,))
-        encoding_dim = 16
-        encoded = Dense(encoding_dim, activation='relu')(input_layer)
-        if dropout_rate > 0:
-            encoded = Dropout(dropout_rate)(encoded)
-        decoded = Dense(input_dim, activation='linear')(encoded)
+    # Get reconstruction error
+    X_pred = autoencoder.predict(X_scaled)
+    mse = np.mean(np.square(X_scaled - X_pred), axis=1)
 
-        autoencoder = Model(inputs=input_layer, outputs=decoded)
-        autoencoder.compile(optimizer='adam', loss='mse')
-        autoencoder.fit(X_scaled, X_scaled, epochs=epochs, batch_size=batch_size, shuffle=True, verbose=0)
+    st.markdown("### MSE Distribution (Reconstruction Error)")
+    fig_mse = px.histogram(mse, nbins=50, title="Reconstruction Error Distribution")
+    st.plotly_chart(fig_mse)
 
-        # Get reconstruction error
-        X_pred = autoencoder.predict(X_scaled)
-        mse = np.mean(np.square(X_scaled - X_pred), axis=1)
+    # Thresholding Method Selection
+    st.markdown("### Thresholding")
+    method = st.radio("Select method to determine threshold", ["Manual (slider)", "Z-score", "IQR"])
 
-        st.markdown("### MSE Distribution (Reconstruction Error)")
-        fig_mse = px.histogram(mse, nbins=50, title="Reconstruction Error Distribution")
-        st.plotly_chart(fig_mse)
+    if method == "Manual (slider)":
+        threshold = st.slider("Set anomaly threshold (between 0 and 1)", 0.0, 1.0, 0.05)
+    elif method == "Z-score":
+        z_scores = (mse - np.mean(mse)) / np.std(mse)
+        z_thresh = st.slider("Set Z-score threshold", 0.0, 5.0, 3.0)
+        threshold = np.percentile(mse, 100 * (1 - np.mean(z_scores > z_thresh)))
+    elif method == "IQR":
+        q1, q3 = np.percentile(mse, [25, 75])
+        iqr = q3 - q1
+        iqr_thresh = st.slider("Set IQR multiplier", 1.0, 3.0, 1.5)
+        threshold = q3 + iqr_thresh * iqr
 
-        # Thresholding Method Selection
-        st.markdown("### Thresholding")
-        method = st.radio("Select method to determine threshold", ["Manual (slider)", "Z-score", "IQR"])
+    anomalies = mse > threshold
+    anomaly_df = df_numeric[anomalies]
+    st.markdown(f"**Anomalies Detected:** {anomalies.sum()} rows")
+    st.dataframe(anomaly_df)
 
-        if method == "Manual (slider)":
-            threshold = st.slider("Set anomaly threshold (between 0 and 1)", 0.0, 1.0, 0.05)
-        elif method == "Z-score":
-            z_scores = (mse - np.mean(mse)) / np.std(mse)
-            z_thresh = st.slider("Set Z-score threshold", 0.0, 5.0, 3.0)
-            threshold = np.percentile(mse, 100 * (1 - np.mean(z_scores > z_thresh)))
-        elif method == "IQR":
-            q1, q3 = np.percentile(mse, [25, 75])
-            iqr = q3 - q1
-            iqr_thresh = st.slider("Set IQR multiplier", 1.0, 3.0, 1.5)
-            threshold = q3 + iqr_thresh * iqr
+    # Allow download of anomalies
+    csv = anomaly_df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download Anomalies", data=csv, file_name="anomalies.csv", mime="text/csv")
 
-        anomalies = mse > threshold
-        anomaly_df = df_numeric[anomalies]
-        st.markdown(f"**Anomalies Detected:** {anomalies.sum()} rows")
-        st.dataframe(anomaly_df)
-
-        # Allow download of anomalies
-        csv = anomaly_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Anomalies", data=csv, file_name="anomalies.csv", mime="text/csv")
-
-        # General Visualization
-        st.markdown("### Data Distribution Explorer")
-        selected_var = st.selectbox("Select a variable to visualize", df.columns)
-        if pd.api.types.is_numeric_dtype(df[selected_var]):
-            plot_type = st.radio("Plot type", ["Histogram", "Line"])
-            if plot_type == "Histogram":
-                fig = px.histogram(df, x=selected_var, title=f"{selected_var} Histogram")
-            else:
-                fig = px.line(df, y=selected_var, title=f"{selected_var} Line Plot")
+    # General Visualization
+    st.markdown("### Data Distribution Explorer")
+    selected_var = st.selectbox("Select a variable to visualize", df.columns)
+    if pd.api.types.is_numeric_dtype(df[selected_var]):
+        plot_type = st.radio("Plot type", ["Histogram", "Line"])
+        if plot_type == "Histogram":
+            fig = px.histogram(df, x=selected_var, title=f"{selected_var} Histogram")
         else:
-            plot_type = st.radio("Plot type", ["Bar", "Pie"])
-            value_counts = df[selected_var].value_counts().reset_index()
-            value_counts.columns = [selected_var, 'Count']
-            if plot_type == "Bar":
-                fig = px.bar(value_counts, x=selected_var, y='Count', title=f"{selected_var} Distribution")
-            else:
-                fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
-        st.plotly_chart(fig)
+            fig = px.line(df, y=selected_var, title=f"{selected_var} Line Plot")
+    else:
+        plot_type = st.radio("Plot type", ["Bar", "Pie"])
+        value_counts = df[selected_var].value_counts().reset_index()
+        value_counts.columns = [selected_var, 'Count']
+        if plot_type == "Bar":
+            fig = px.bar(value_counts, x=selected_var, y='Count', title=f"{selected_var} Distribution")
+        else:
+            fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
+    st.plotly_chart(fig)
