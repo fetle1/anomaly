@@ -413,6 +413,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
         encoding_dim = 16 
         input_dim = X_scaled.shape[1]
         input_layer = Input(shape=(input_dim,))
+        encoding_dim = 16
         encoded = Dense(encoding_dim, activation='relu')(input_layer)
         if dropout_rate > 0:
             encoded = Dropout(dropout_rate)(encoded)
