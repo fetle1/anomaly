@@ -444,6 +444,7 @@ elif method == "Autoencoder":
     # General Visualization
     st.markdown("### Data Distribution Explorer")
     selected_var = st.selectbox("Select a variable to visualize", df.columns)
+    import plotly.express as px
     if pd.api.types.is_numeric_dtype(df[selected_var]):
         plot_type = st.radio("Plot type", ["Histogram", "Line"])
         if plot_type == "Histogram":
