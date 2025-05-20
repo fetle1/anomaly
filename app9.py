@@ -146,45 +146,88 @@ def impute_knn_all(df, n_neighbors=5):
 # Rule-based anomaly detection function
 def detect_rule_based_anomalies(df):
     anomalies = pd.Series([False] * len(df), index=df.index)
+    reasons = {i: [] for i in df.index}  # Dictionary to track reasons for each row
 
     def col_exists(*cols):
         return all(col in df.columns for col in cols)
 
     if col_exists('hemoglobin'):
-        anomalies |= df['hemoglobin'] <= 0
+        condition = df['hemoglobin'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Hemoglobin ≤ 0")
 
     if col_exists('glucose'):
-        anomalies |= df['glucose'] <= 0
+        condition = df['glucose'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Glucose ≤ 0")
 
     if col_exists('spo2'):
-        anomalies |= df['spo2'] <= 0
+        condition = df['spo2'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("SpO2 ≤ 0")
 
     if col_exists('systolic', 'dystolic'):
-        anomalies |= df['dystolic'] > df['systolic']
+        condition = df['dystolic'] > df['systolic']
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Dystolic > Systolic")
 
     if col_exists('sex', 'pregnant'):
-        anomalies |= (df['sex'].astype(str).str.lower() == 'male') & (df['pregnant'] == True)
+        condition = (df['sex'].astype(str).str.lower() == 'male') & (df['pregnant'] == True)
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Male marked as pregnant")
 
     if col_exists('sex', 'bph'):
-        anomalies |= (df['sex'].astype(str).str.lower() == 'female') & (df['bph'] == True)
+        condition = (df['sex'].astype(str).str.lower() == 'female') & (df['bph'] == True)
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Female marked as having BPH")
 
     if col_exists('age', 'pregnant'):
-        anomalies |= (df['age'] < 5) & (df['pregnant'] == True)
-        anomalies |= (df['age'] > 70) & (df['pregnant'] == True)
+        condition_young = (df['age'] < 5) & (df['pregnant'] == True)
+        condition_old = (df['age'] > 70) & (df['pregnant'] == True)
+        anomalies |= condition_young | condition_old
+        for i in df[condition_young].index:
+            reasons[i].append("Pregnant but age < 5")
+        for i in df[condition_old].index:
+            reasons[i].append("Pregnant but age > 70")
 
     if col_exists('dob', 'dod'):
-        anomalies |= pd.to_datetime(df['dob'], errors='coerce') > pd.to_datetime(df['dod'], errors='coerce')
+        dob = pd.to_datetime(df['dob'], errors='coerce')
+        dod = pd.to_datetime(df['dod'], errors='coerce')
+        condition = dob > dod
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("DOB after DOD")
 
     if col_exists('admission_date', 'discharge_date'):
-        anomalies |= pd.to_datetime(df['discharge_date'], errors='coerce') < pd.to_datetime(df['admission_date'], errors='coerce')
+        adm = pd.to_datetime(df['admission_date'], errors='coerce')
+        dis = pd.to_datetime(df['discharge_date'], errors='coerce')
+        condition = dis < adm
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Discharge before admission")
+
     if col_exists('pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy', 'sex'):
-        anomalies |= ((df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'] == 3) &
-                (df['sex'].astype(str).str.upper() == 'F')            )
-    
-        anomalies |= ((df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'].isin([1, 2])) &
-                (df['sex'].astype(str).str.upper() == 'M')
-            )
-    return anomalies
+        condition_f = (df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'] == 3) & \
+                      (df['sex'].astype(str).str.upper() == 'F')
+        condition_m = df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'].isin([1, 2]) & \
+                      (df['sex'].astype(str).str.upper() == 'M')
+        anomalies |= condition_f | condition_m
+        for i in df[condition_f].index:
+            reasons[i].append("Female marked as death due to pregnancy-related causes (code 3)")
+        for i in df[condition_m].index:
+            reasons[i].append("Male marked as pregnant/died due to pregnancy-related causes (code 1/2)")
+
+    # Only keep reasons for rows where anomalies == True
+    reasons_final = {i: "; ".join(reasons[i]) for i in df[anomalies].index}
+
+    return anomalies, reasons_final
+
 
 # -----------------------------
 # Streamlit UI Logic - Tabs
