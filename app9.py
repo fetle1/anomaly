@@ -480,14 +480,14 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
                 fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
         st.plotly_chart(fig)
     elif detection_method == "Statistical":
-    numeric_cols = df.select_dtypes(include='number').columns.tolist()
-    selected_var = st.selectbox("Select numeric variable to analyze", numeric_cols)
-
-    st.markdown("### Distribution Overview")
-    fig_hist = px.histogram(df, x=selected_var, nbins=50, title=f"{selected_var} Distribution")
-    st.plotly_chart(fig_hist)
-
-    stat_method = st.radio("Select statistical method", ["Z-score", "Median", "IQR"])
+        numeric_cols = df.select_dtypes(include='number').columns.tolist()
+        selected_var = st.selectbox("Select numeric variable to analyze", numeric_cols)
+    
+        st.markdown("### Distribution Overview")
+        fig_hist = px.histogram(df, x=selected_var, nbins=50, title=f"{selected_var} Distribution")
+        st.plotly_chart(fig_hist)
+    
+        stat_method = st.radio("Select statistical method", ["Z-score", "Median", "IQR"])
 
     if stat_method == "Z-score":
         threshold = st.slider("Z-score Threshold", 0.0, 5.0, 3.0)
