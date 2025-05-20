@@ -134,6 +134,42 @@ def impute_knn_all(df, n_neighbors=5):
     knn = KNNImputer(n_neighbors=n_neighbors)
     df[numeric_cols] = knn.fit_transform(df[numeric_cols])
     return df
+# Rule-based anomaly detection function
+def detect_rule_based_anomalies(df):
+    anomalies = pd.Series([False] * len(df), index=df.index)
+
+    def col_exists(*cols):
+        return all(col in df.columns for col in cols)
+
+    if col_exists('hemoglobin'):
+        anomalies |= df['hemoglobin'] <= 0
+
+    if col_exists('glucose'):
+        anomalies |= df['glucose'] <= 0
+
+    if col_exists('spo2'):
+        anomalies |= df['spo2'] <= 0
+
+    if col_exists('systolic', 'dystolic'):
+        anomalies |= df['dystolic'] > df['systolic']
+
+    if col_exists('sex', 'pregnant'):
+        anomalies |= (df['sex'].astype(str).str.lower() == 'male') & (df['pregnant'] == True)
+
+    if col_exists('sex', 'bph'):
+        anomalies |= (df['sex'].astype(str).str.lower() == 'female') & (df['bph'] == True)
+
+    if col_exists('age', 'pregnant'):
+        anomalies |= (df['age'] < 5) & (df['pregnant'] == True)
+        anomalies |= (df['age'] > 70) & (df['pregnant'] == True)
+
+    if col_exists('dob', 'dod'):
+        anomalies |= pd.to_datetime(df['dob'], errors='coerce') > pd.to_datetime(df['dod'], errors='coerce')
+
+    if col_exists('admission_date', 'discharge_date'):
+        anomalies |= pd.to_datetime(df['discharge_date'], errors='coerce') < pd.to_datetime(df['admission_date'], errors='coerce')
+
+    return anomalies
 
 # -----------------------------
 # Streamlit UI Logic - Tabs
