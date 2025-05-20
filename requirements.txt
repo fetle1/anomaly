@@ -6,3 +6,4 @@ rich
 markdown-it-py
 mdurl
 pygments
+matplotlib
