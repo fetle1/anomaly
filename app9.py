@@ -441,7 +441,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
     
         if thershold_method == "Manual (slider)":
             threshold = st.slider("Set anomaly threshold (between 0 and 1)", 0.0, 1.0, 0.05)
-        elif thershold method == "Z-score":
+        elif thershold_method == "Z-score":
             z_scores = (mse - np.mean(mse)) / np.std(mse)
             z_thresh = st.slider("Set Z-score threshold", 0.0, 5.0, 3.0)
             threshold = np.percentile(mse, 100 * (1 - np.mean(z_scores > z_thresh)))
