@@ -389,6 +389,7 @@ elif method == "Autoencoder":
     from tensorflow.keras.models import Model
     from tensorflow.keras.layers import Input, Dense, Dropout
     import tensorflow as tf
+    import plotly.express as px
 
     # Filter numeric columns only
     numeric_cols = df.select_dtypes(include='number').columns
