@@ -76,7 +76,15 @@ def clean_and_preprocess(df):
     if "Unnamed: 0" in df.columns:
         df.drop(columns=["Unnamed: 0"], inplace=True)
         changes.append("Dropped column: Unnamed: 0")
-    df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+    df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(".", "_", regex=False)
+    changes.append("Normalized column names: replaced spaces and dots with underscores, lowercased")
+
+    # Rename any column that includes 'gender' to 'sex'
+    gender_columns = [col for col in df.columns if 'gender' in col]
+    for col in gender_columns:
+        df.rename(columns={col: 'sex'}, inplace=True)
+        changes.append(f"Renamed column '{col}' to 'sex'")
+
     changes.append("Normalized column names")
     return df, changes
 
@@ -170,7 +178,13 @@ def detect_rule_based_anomalies(df):
 
     if col_exists('admission_date', 'discharge_date'):
         anomalies |= pd.to_datetime(df['discharge_date'], errors='coerce') < pd.to_datetime(df['admission_date'], errors='coerce')
-
+    if col_exists('pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy', 'sex'):
+        anomalies |= ((df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'] == 3) &
+                (df['sex'].astype(str).str.upper() == 'F')            )
+    
+        anomalies |= ((df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'].isin([1, 2])) &
+                (df['sex'].astype(str).str.upper() == 'M')
+            )
     return anomalies
 
 # -----------------------------
