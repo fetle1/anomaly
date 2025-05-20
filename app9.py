@@ -410,7 +410,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
 
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(df_numeric)
-
+        encoding_dim = 16 
         input_dim = X_scaled.shape[1]
         input_layer = Input(shape=(input_dim,))
         encoded = Dense(encoding_dim, activation='relu')(input_layer)
