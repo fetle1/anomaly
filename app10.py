@@ -172,18 +172,151 @@ def impute_knn_all(df, n_neighbors=5):
 
 # --------------------------
 # Streamlit App Starts Here
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import missingno as msno
+from sklearn.impute import KNNImputer
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, Dropout
+from tensorflow.keras import regularizers
+from datetime import datetime
+import base64
+import io
+
+# ---------- CSS STYLING ----------
+
+def local_css():
+    css = """
+    <style>
+    body {
+        background: linear-gradient(to bottom, #ffffff, #f0f0f5);
+        color: #1a1a1a;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .main {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: linear-gradient(to right, #e0f7fa, #e3f2fd);
+        border-radius: 12px;
+        padding: 10px;
+        margin: 2px;
+        font-weight: bold;
+        color: #0d47a1;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background: #bbdefb;
+    }
+    .stTabs [data-baseweb="tab"]:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px #64b5f6;
+    }
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+# ---------- LOGO AND BACKGROUND ----------
+
+def set_background_and_logo(logo_path=None, background_image_path=None):
+    if background_image_path:
+        with open(background_image_path, "rb") as img_file:
+            b64_bg = base64.b64encode(img_file.read()).decode()
+        page_bg_img = f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/png;base64,{b64_bg}");
+            background-size: cover;
+            background-position: center;
+        }}
+        </style>
+        """
+        st.markdown(page_bg_img, unsafe_allow_html=True)
+
+    if logo_path:
+        st.image(logo_path, width=150)
 # --------------------------
-st.set_page_config(layout="wide")
-st.title("TafitiX")
 
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = T("Upload")
+ef main():
+    st.set_page_config(page_title="Clinical Data Explorer", layout="wide")
+    local_css()
 
-tabs = [T("Upload"), T("Preprocessing"), T("Missing Data Analysis"), T("Data Overview"), T("Anomaly Detection")]
-tab_selection = st.sidebar.radio("Navigation", tabs)
-st.session_state.active_tab = tab_selection
+    with st.sidebar:
+        logo_path = st.file_uploader("Upload logo (optional)", type=["png", "jpg"])
+        bg_path = st.file_uploader("Upload background image (optional)", type=["png", "jpg"])
+        language = st.selectbox("Select Language", ["English", "Swahili", "French"])
 
-st.markdown(f"You are here: ➤ **{st.session_state.active_tab}**")
+    set_background_and_logo(logo_path, bg_path)
+
+    tabs = st.tabs(["Home", "Upload", "Preprocessing", "Data Overview", "Missing Analysis", "Anomaly Detection"])
+
+    with tabs[0]:
+        st.title("Clinical Data Explorer")
+        st.write("Welcome! Please navigate through the tabs to upload, explore, clean, and analyze your data.")
+
+    with tabs[1]:
+        st.header("Upload Data")
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+        if uploaded_file is not None:
+            df = pd.read_csv(uploaded_file)
+            st.session_state.df, changes = clean_and_preprocess(df)
+            st.session_state.df = merge_and_clean_birth_death_dates(st.session_state.df)
+            st.success("File uploaded and cleaned!")
+            if changes:
+                st.write("Changes made during cleaning:")
+                for change in changes:
+                    st.markdown(f"- {change}")
+
+    with tabs[2]:
+        st.header("Preprocessing")
+        if 'df' in st.session_state:
+            st.dataframe(st.session_state.df.head())
+        else:
+            st.warning("Please upload data first.")
+
+    with tabs[3]:
+        st.header("Data Overview")
+        if 'df' in st.session_state:
+            st.write("Summary statistics:")
+            st.dataframe(st.session_state.df.describe(include='all'))
+
+            col = st.selectbox("Select column for visualization", st.session_state.df.columns)
+            if pd.api.types.is_numeric_dtype(st.session_state.df[col]):
+                st.bar_chart(st.session_state.df[col])
+            else:
+                st.bar_chart(st.session_state.df[col].value_counts())
+        else:
+            st.warning("Please upload data first.")
+
+    with tabs[4]:
+        st.header("Missing Data Analysis")
+        if 'df' in st.session_state:
+            st.write("Missing values:")
+            st.dataframe(st.session_state.df.isnull().sum().reset_index().rename(columns={0: 'Missing Count'}))
+
+            st.pyplot(msno.matrix(st.session_state.df))
+        else:
+            st.warning("Please upload data first.")
+
+    with tabs[5]:
+        st.header("Rule-Based Anomaly Detection")
+        if 'df' in st.session_state:
+            anomalies = rule_based_anomalies(st.session_state.df)
+            st.write(f"Detected {len(anomalies)} anomalies.")
+            st.dataframe(anomalies)
+        else:
+            st.warning("Please upload data first.")
+
+if __name__ == '__main__':
+    main()
+
+#
 
 # Upload Tab
 if st.session_state.active_tab == T("Upload"):
