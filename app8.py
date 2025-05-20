@@ -182,7 +182,7 @@ if "active_tab" not in st.session_state:
 breadcrumb = f"You are here: ➤ <span>{st.session_state.active_tab}</span>"
 st.markdown(f'<div class="breadcrumb">{breadcrumb}</div>', unsafe_allow_html=True)
 
-tabs = [T("Upload"), T("Preprocessing"), "Data Overview", T("Missing Data Analysis"), T("Anomaly Detection")]
+tabs = [T("Upload"), T("Preprocessing"), T("Missing Data Analysis"), T("Anomaly Detection"), T("Export Reports")]
 tab_selection = st.sidebar.radio("Navigation", tabs)
 st.session_state.active_tab = tab_selection
 
@@ -423,4 +423,60 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
         with col2:
             st.empty()
         st.markdown('</div>', unsafe_allow_html=True)
+elif st.session_state.active_tab == T("Export Reports"):
+    st.subheader(T("Export Reports"))
 
+    if "df_imputed" not in st.session_state:
+        st.warning("Please preprocess and impute your data before generating a report.")
+    else:
+        df = st.session_state["df_imputed"]
+        anomaly_df = st.session_state.get("anomalies_df", pd.DataFrame())
+        
+        # Sample summary for the report
+        summary_stats = df.describe().to_html(classes="table table-striped", border=0)
+        anomalies_html = anomaly_df.to_html(classes="table table-bordered", border=0) if not anomaly_df.empty else "<p>No anomalies detected.</p>"
+
+        report_template = """
+        <html>
+        <head>
+        <style>
+            body { font-family: Arial; padding: 20px; }
+            h1, h2 { color: #2c3e50; }
+            .section { margin-bottom: 30px; }
+            .table { width: 100%; border-collapse: collapse; }
+            .table th, .table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        </style>
+        </head>
+        <body>
+        <h1>Data Processing Report</h1>
+
+        <div class="section">
+            <h2>1. Summary Statistics</h2>
+            {{ summary_stats }}
+        </div>
+
+        <div class="section">
+            <h2>2. Anomalies</h2>
+            {{ anomalies_html }}
+        </div>
+
+        </body>
+        </html>
+        """
+
+        from jinja2 import Template
+        html = Template(report_template).render(summary_stats=summary_stats, anomalies_html=anomalies_html)
+
+        # Save HTML to buffer
+        import io
+        html_file = io.BytesIO(html.encode('utf-8'))
+        st.download_button("📄 Download HTML Report", data=html_file, file_name="report.html", mime="text/html")
+
+        # Generate and download PDF (optional, comment out if not supported)
+        try:
+            import weasyprint
+            pdf_file = weasyprint.HTML(string=html).write_pdf()
+            st.download_button("📄 Download PDF Report", data=pdf_file, file_name="report.pdf", mime="application/pdf")
+        except Exception as e:
+            st.error("PDF export failed. Ensure WeasyPrint is installed.")
+            st.code(str(e), language='bash')
