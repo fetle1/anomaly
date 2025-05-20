@@ -191,40 +191,69 @@ def apply_default_strategy(df, options):
     return df
 
 def detect_rule_based_anomalies(df):
-    anomalies = pd.Series([False] * len(df), index=df.index)
+    reasons = []
+    for _ in range(len(df)):
+        reasons.append([])
 
     def col_exists(*cols):
         return all(col in df.columns for col in cols)
 
     if col_exists('hemoglobin'):
-        anomalies |= df['hemoglobin'] <= 0
+        mask = df['hemoglobin'] <= 0
+        for i in df[mask].index:
+            reasons[i].append("Hemoglobin ≤ 0")
 
     if col_exists('glucose'):
-        anomalies |= df['glucose'] <= 0
+        mask = df['glucose'] <= 0
+        for i in df[mask].index:
+            reasons[i].append("Glucose ≤ 0")
 
     if col_exists('spo2'):
-        anomalies |= df['spo2'] <= 0
+        mask = df['spo2'] <= 0
+        for i in df[mask].index:
+            reasons[i].append("SpO2 ≤ 0")
 
     if col_exists('systolic', 'dystolic'):
-        anomalies |= df['dystolic'] > df['systolic']
+        mask = df['dystolic'] > df['systolic']
+        for i in df[mask].index:
+            reasons[i].append("Dystolic > Systolic")
 
     if col_exists('sex', 'pregnant'):
-        anomalies |= (df['sex'].str.lower() == 'male') & (df['pregnant'] == True)
+        mask = (df['sex'].str.lower() == 'male') & (df['pregnant'] == True)
+        for i in df[mask].index:
+            reasons[i].append("Male marked as pregnant")
 
     if col_exists('sex', 'bph'):
-        anomalies |= (df['sex'].str.lower() == 'female') & (df['bph'] == True)
+        mask = (df['sex'].str.lower() == 'female') & (df['bph'] == True)
+        for i in df[mask].index:
+            reasons[i].append("Female marked with BPH")
 
     if col_exists('age', 'pregnant'):
-        anomalies |= (df['age'] < 5) & (df['pregnant'] == True)
-        anomalies |= (df['age'] > 70) & (df['pregnant'] == True)
+        mask_young = (df['age'] < 5) & (df['pregnant'] == True)
+        for i in df[mask_young].index:
+            reasons[i].append("Child under 5 marked pregnant")
+        mask_old = (df['age'] > 70) & (df['pregnant'] == True)
+        for i in df[mask_old].index:
+            reasons[i].append("Elderly (>70) marked pregnant")
 
     if col_exists('dob', 'dod'):
-        anomalies |= pd.to_datetime(df['dob'], errors='coerce') > pd.to_datetime(df['dod'], errors='coerce')
+        mask = pd.to_datetime(df['dob'], errors='coerce') > pd.to_datetime(df['dod'], errors='coerce')
+        for i in df[mask].index:
+            reasons[i].append("Date of birth after date of death")
 
     if col_exists('admission_date', 'discharge_date'):
-        anomalies |= pd.to_datetime(df['discharge_date'], errors='coerce') < pd.to_datetime(df['admission_date'], errors='coerce')
+        mask = pd.to_datetime(df['discharge_date'], errors='coerce') < pd.to_datetime(df['admission_date'], errors='coerce')
+        for i in df[mask].index:
+            reasons[i].append("Discharge before admission")
 
-    return anomalies
+    # Final anomaly flag
+    anomaly_flags = [bool(r) for r in reasons]
+    reasons_str = ["; ".join(r) if r else "" for r in reasons]
+    df_anomalies = df.copy()
+    df_anomalies["Anomaly Reason"] = reasons_str
+
+    return anomaly_flags, df_anomalies
+
 # -----------------------------
 # Streamlit UI Logic
 st.title("TafitiX")
@@ -350,22 +379,12 @@ elif st.session_state.active_tab == "Missing Data Analysis":
 elif st.session_state.active_tab == T("Anomaly Detection"):
     st.subheader(T("Anomaly Detection"))
 
-    if "data" in st.session_state:
-        df = st.session_state.data.copy()
+    if "df_imputed" in st.session_state:
+        df = st.session_state["df_imputed"].copy()
 
-        # Run rule-based anomaly detection
-        anomalies = detect_rule_based_anomalies(df)
-
-        anomaly_df = df[anomalies]
-        st.write(anomaly_df)
-
-        count = anomalies.sum()
-        elif st.session_state.active_tab == T("Anomaly Detection"):
-    if "data" in st.session_state:
-        df = st.session_state.data.copy()
-        anomalies = detect_rule_based_anomalies(df)
-        anomaly_df = df[anomalies]
-        count = anomalies.sum()
+        anomalies, df_with_reasons = detect_rule_based_anomalies(df)
+        anomaly_df = df_with_reasons[anomalies]
+        count = sum(anomalies)
 
         if count > 0:
             st.success(T("Anomalies found").format(count))
@@ -377,11 +396,3 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
     else:
         st.warning("⚠ Please upload and preprocess data first.")
 
-        
-
-# -----------------------------
-# Streamlit UI Logic
-# -----------------------------
-
-
-# Update the tab-specific content logic in other cells as needed
