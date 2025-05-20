@@ -393,10 +393,10 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
             st.markdown(f"### 🔍 {count} anomalies detected by Rule-Based method.")
 
         elif method == "Autoencoder":
-        batch_size = 32
-        dropout_rate = 0.0
-        encoding_dim = 16
-        epochs = 20
+            batch_size = 32
+            dropout_rate = 0.0
+            encoding_dim = 16
+            epochs = 20
 
         # Scale data and train autoencoder
         from sklearn.preprocessing import StandardScaler
