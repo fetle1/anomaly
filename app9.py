@@ -380,8 +380,8 @@ elif st.session_state.active_tab == T("Missing Data Analysis"):
 # Anomaly Detection Tab
 elif st.session_state.active_tab == T("Anomaly Detection"):
     st.subheader("Anomaly Detection")
-    method = st.radio("Select Anomaly Detection Method", ["Rule-Based", "Autoencoder", "Statistical"])
-    if method == "Rule-Based":
+    detection_method = st.radio("Select Anomaly Detection Method", ["Rule-Based", "Autoencoder", "Statistical"])
+    if detection_method == "Rule-Based":
         anomalies, reasons = detect_rule_based_anomalies(df.copy())
         anomaly_df = df[anomalies].copy()
         anomaly_df["Reason"] = [reasons[i] for i in anomaly_df.index]
@@ -392,7 +392,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
         csv = anomaly_df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Rule-Based Anomalies", data=csv, file_name="rule_based_anomalies.csv", mime="text/csv")
 
-    elif method == "Autoencoder":
+    elif detection_method == "Autoencoder":
         batch_size = 32
         dropout_rate = 0.0
         encoding_dim = 16
@@ -437,15 +437,15 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
     
         # Thresholding Method Selection
         st.markdown("### Thresholding")
-        method = st.radio("Select method to determine threshold", ["Manual (slider)", "Z-score", "IQR"])
+        thershold_method = st.radio("Select method to determine threshold", ["Manual (slider)", "Z-score", "IQR"])
     
-        if method == "Manual (slider)":
+        if thershold_method == "Manual (slider)":
             threshold = st.slider("Set anomaly threshold (between 0 and 1)", 0.0, 1.0, 0.05)
-        elif method == "Z-score":
+        elif thershold method == "Z-score":
             z_scores = (mse - np.mean(mse)) / np.std(mse)
             z_thresh = st.slider("Set Z-score threshold", 0.0, 5.0, 3.0)
             threshold = np.percentile(mse, 100 * (1 - np.mean(z_scores > z_thresh)))
-        elif method == "IQR":
+        elif thershold_method == "IQR":
             q1, q3 = np.percentile(mse, [25, 75])
             iqr = q3 - q1
             iqr_thresh = st.slider("Set IQR multiplier", 1.0, 3.0, 1.5)
@@ -479,7 +479,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
             else:
                 fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
         st.plotly_chart(fig)
-    elif method == "Statistical":
+    elif detection_method == "Statistical":
     numeric_cols = df.select_dtypes(include='number').columns.tolist()
     selected_var = st.selectbox("Select numeric variable to analyze", numeric_cols)
 
