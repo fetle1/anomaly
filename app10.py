@@ -7,7 +7,20 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Dropout
 import tensorflow as tf
 import plotly.express as px
-
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import missingno as msno
+from sklearn.impute import KNNImputer
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, Dropout
+from tensorflow.keras import regularizers
+from datetime import datetime
+import base64
+import io
 # Replace with actual translation if needed
 #T = lambda x: x  
 
@@ -172,20 +185,7 @@ def impute_knn_all(df, n_neighbors=5):
 
 # --------------------------
 # Streamlit App Starts Here
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import missingno as msno
-from sklearn.impute import KNNImputer
-from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Dense, Dropout
-from tensorflow.keras import regularizers
-from datetime import datetime
-import base64
-import io
+
 
 # ---------- CSS STYLING ----------
 
