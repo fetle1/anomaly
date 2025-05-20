@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
+import subprocess
+subprocess.run(["pip", "install", "--upgrade", "pip"])
 
 # Optional visualization libraries
 import matplotlib.pyplot as plt
