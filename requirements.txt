@@ -9,3 +9,6 @@ pygments
 matplotlib
 seaborn
 missingno
+inja2 
+pdfkit 
+weasyprint
