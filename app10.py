@@ -66,9 +66,9 @@ def merge_and_clean_birth_death_dates(df):
 
     return df, changes
 
-def detect_rule_based_anomalies(df):
-    def col_exists(*cols):
-return all(col in df.columns for col in cols)
+#def detect_rule_based_anomalies(df):
+ #   def col_exists(*cols):
+#return all(col in df.columns for col in cols)
 
 def rule_based_anomaly_detection(df):
     anomalies = pd.Series([False] * len(df))
