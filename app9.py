@@ -437,7 +437,8 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
     
         st.markdown(f"**Detected {len(anomaly_df)} anomalies**")
         st.dataframe(anomaly_df)
-    
+    return df, report = apply_default_strategy(df, opts)
+
         csv = anomaly_df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Rule-Based Anomalies", data=csv, file_name="rule_based_anomalies.csv", mime="text/csv")
 
