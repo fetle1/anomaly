@@ -473,10 +473,10 @@ elif st.session_state.active_tab == T("Export Reports"):
         st.download_button("📄 Download HTML Report", data=html_file, file_name="report.html", mime="text/html")
 
         # Generate and download PDF (optional, comment out if not supported)
-        try:
-            import weasyprint
-            pdf_file = weasyprint.HTML(string=html).write_pdf()
-            st.download_button("📄 Download PDF Report", data=pdf_file, file_name="report.pdf", mime="application/pdf")
-        except Exception as e:
-            st.error("PDF export failed. Ensure WeasyPrint is installed.")
-            st.code(str(e), language='bash')
+        #try:
+         #   import weasyprint
+          #  pdf_file = weasyprint.HTML(string=html).write_pdf()
+           # st.download_button("📄 Download PDF Report", data=pdf_file, file_name="report.pdf", mime="application/pdf")
+        #except Exception as e:
+         #   st.error("PDF export failed. Ensure WeasyPrint is installed.")
+          #  st.code(str(e), language='bash')
