@@ -362,24 +362,65 @@ elif st.session_state.active_tab == T("Missing Data Analysis"):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Anomaly Detection Tab
+# Anomaly Detection Tab
 elif st.session_state.active_tab == T("Anomaly Detection"):
-    st.subheader("Rule-Based Anomaly Detection")
+    st.subheader(T("Anomaly Detection"))
 
-    if "df_imputed" in st.session_state:
-        df = st.session_state["df_imputed"].copy()
-
-        # Run rule-based anomaly detection
-        anomalies = detect_rule_based_anomalies(df)
-        anomaly_df = df[anomalies]
-        count = anomalies.sum()
-
-        if count > 0:
-            st.success(f"✅ {count} anomaly{'ies' if count > 1 else ''} found")
-            st.dataframe(anomaly_df)
-
-            csv = anomaly_df.to_csv(index=False).encode('utf-8')
-            st.download_button(label="📥 Download Anomalies", data=csv, file_name='anomalies.csv', mime='text/csv')
-        else:
-            st.info("No anomalies detected using rule-based logic.")
+    if "df_imputed" not in st.session_state:
+        st.warning("⚠ Please preprocess and impute your data first.")
     else:
-        st.warning("⚠ Please preprocess and impute data first.")
+        df = st.session_state["df_imputed"].copy()
+        method = st.radio("Choose Detection Method", ["Rule-Based", "Autoencoder"], horizontal=True)
+
+        if method == "Rule-Based":
+            anomalies = detect_rule_based_anomalies(df)
+            count = anomalies.sum()
+            st.markdown(f"### 🔍 {count} anomalies detected by Rule-Based method.")
+
+        elif method == "Autoencoder":
+            encoding_dim = st.slider("Encoding Dimension", min_value=2, max_value=32, value=8)
+            threshold = st.slider("Anomaly Score Threshold", min_value=0.0, max_value=1.0, value=0.1, step=0.01)
+
+            numeric_df = df.select_dtypes(include=["float64", "int", "int64"]).dropna()
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(numeric_df)
+
+            # Build and train autoencoder
+            input_dim = X_scaled.shape[1]
+            input_layer = Input(shape=(input_dim,))
+            encoded = Dense(encoding_dim, activation='relu')(input_layer)
+            decoded = Dense(input_dim, activation='linear')(encoded)
+            autoencoder = Model(inputs=input_layer, outputs=decoded)
+            autoencoder.compile(optimizer='adam', loss='mse')
+
+            autoencoder.fit(X_scaled, X_scaled, epochs=20, batch_size=16, verbose=0)
+
+            # Predict and calculate reconstruction error
+            X_pred = autoencoder.predict(X_scaled)
+            mse = np.mean(np.power(X_scaled - X_pred, 2), axis=1)
+            anomaly_flags = mse > threshold
+
+            # Save and display anomalies
+            anomalies = pd.Series(False, index=df.index)
+            anomalies[numeric_df.index] = anomaly_flags
+            count = anomalies.sum()
+            st.markdown(f"### 🤖 {count} anomalies detected by Autoencoder.")
+
+        # Show anomalies
+        anomaly_df = df[anomalies]
+        if count > 0:
+            st.dataframe(anomaly_df)
+            csv = anomaly_df.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇ Download Anomaly Report (CSV)", data=csv, file_name="anomalies.csv", mime="text/csv")
+        else:
+            st.info("✅ No anomalies detected.")
+
+        st.markdown('<div class="bottom-button-container">', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅ Back"):
+                st.session_state.active_tab = "Missing Data Analysis"
+        with col2:
+            st.empty()
+        st.markdown('</div>', unsafe_allow_html=True)
+
