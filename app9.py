@@ -378,8 +378,14 @@ elif st.session_state.active_tab == T("Missing Data Analysis"):
 
 # Anomaly Detection Tab
 # Anomaly Detection Tab
+
 elif st.session_state.active_tab == T("Anomaly Detection"):
     st.subheader("Anomaly Detection")
+    if "df_imputed" in st.session_state:
+        df = st.session_state["df_imputed"]
+    else:
+        st.warning("Please complete the data imputation step before detecting anomalies.")
+        st.stop()
     detection_method = st.radio("Select Anomaly Detection Method", ["Rule-Based", "Autoencoder", "Statistical"])
     if detection_method == "Rule-Based":
         anomalies, reasons = detect_rule_based_anomalies(df.copy())
