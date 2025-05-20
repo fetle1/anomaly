@@ -9,7 +9,7 @@ import seaborn as sns
 
 # For imputation
 from sklearn.impute import KNNImputer
-
+import pygments
 # Translation dictionary
 translations = {
     "en": {
