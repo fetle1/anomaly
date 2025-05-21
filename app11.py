@@ -96,7 +96,7 @@ def T(text):
     return translations.get(lang, translations["en"]).get(text, text)
 
 # Page config
-st.set_page_config(page_title="TafitiX", layout="wide")
+
 
 # Sidebar language selector
 lang = st.sidebar.selectbox("🌐 Language / Lugha / Langue", ["en", "sw", "fr"], format_func=lambda x: translations[x]["Upload"])
