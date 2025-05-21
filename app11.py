@@ -187,11 +187,11 @@ def preprocessing():
          changes.append("Split 'bp' into 'systolic_bp' and 'diastolic_bp'")
     
     if changes:
-         st.markdown("### ✅ Cleaning Actions Performed:")
-         for change in changes:
-             st.write(f"- {change}")
-        else:
-            st.info("No automatic cleaning changes were made.")
+        st.markdown("### ✅ Cleaning Actions Performed:")
+        for change in changes:
+           st.write(f"- {change}")
+    else:
+        st.info("No automatic cleaning changes were made.")
     st.session_state.data = df
     
         # --- VARIABLE TYPE CONVERSION ---
