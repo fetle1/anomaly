@@ -156,12 +156,9 @@ def preprocessing():
     df = st.session_state.data
     # [perform your preprocessing steps here...]
     st.subheader(T("Data Cleaning"))
-    
-        changes = []
-    
-        # --- AUTOMATED CLEANING SECTION ---
-        df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
-        changes.append("Stripped and standardized column names")
+     changes = []
+     df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+     changes.append("Stripped and standardized column names")
     
         gender_columns = [col for col in df.columns if 'gender' in col]
         for col in gender_columns:
