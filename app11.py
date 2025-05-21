@@ -14,6 +14,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Dropout
 
+st.set_page_config(page_title="Anomaly Detection App", layout="wide")
 # Translation dictionary
 translations = {
     "en": {
