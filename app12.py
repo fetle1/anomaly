@@ -462,89 +462,131 @@ def basic_anomaly_detection():
 
 def autoencoder_anomaly_detection():
     st.header(T("Advanced") + " - Autoencoder")
-    df = st.session_state.data
-    if not st.session_state.preprocessing_complete:
+
+    if not st.session_state.get("preprocessing_complete", False):
         st.warning("Please complete preprocessing first.")
         return
+
+    df = st.session_state.data
     numeric_df = df.select_dtypes(include=[np.number]).dropna()
+
     if numeric_df.empty:
         st.warning("No numeric columns available for autoencoder.")
         return
 
-    # --- Hyperparameters ---
-    encoding_dim = st.slider(T("Encoding Dimension"), min_value=2, max_value=64, value=16)
-    dropout_rate = st.slider(T("Dropout Rate"), 0.0, 0.5, 0.0)
-    epochs = st.slider(T("Epochs"), 5, 100, 20)
+    # --- Top-level Options ---
+    mode = st.radio("Choose Action", ["Detect Anomalies", "Change Parameters"])
 
-    # --- Build Autoencoder ---
-    input_dim = numeric_df.shape[1]
-    input_layer = Input(shape=(input_dim,))
-    encoded = Dense(encoding_dim, activation="relu")(input_layer)
-    if dropout_rate > 0:
-        encoded = Dropout(dropout_rate)(encoded)
-    decoded = Dense(input_dim, activation="linear")(encoded)
+    # --- Default Hyperparameters ---
+    default_encoding_dim = 16
+    default_dropout_rate = 0.0
+    default_epochs = 20
+    default_iqr_multiplier = 2.5
 
-    autoencoder = Model(inputs=input_layer, outputs=decoded)
-    autoencoder.compile(optimizer='adam', loss='mse')
+    # --- Autoencoder Model Builder ---
+    def build_autoencoder(input_dim, encoding_dim, dropout_rate):
+        input_layer = Input(shape=(input_dim,))
+        encoded = Dense(encoding_dim, activation="relu")(input_layer)
+        if dropout_rate > 0:
+            encoded = Dropout(dropout_rate)(encoded)
+        decoded = Dense(input_dim, activation="linear")(encoded)
+        autoencoder = Model(inputs=input_layer, outputs=decoded)
+        autoencoder.compile(optimizer='adam', loss='mse')
+        return autoencoder
 
-    # --- Auto Train + Detect ---
-    if st.button(T("Detect Anomalies Based on Hyperparameters")):
-        history = autoencoder.fit(numeric_df, numeric_df,
-                                  epochs=epochs,
-                                  batch_size=32,
-                                  shuffle=True,
-                                  verbose=0)
+    if mode == "Detect Anomalies":
+        st.subheader("🔍 Detected Anomalies (Default Settings)")
+        autoencoder = build_autoencoder(numeric_df.shape[1], default_encoding_dim, default_dropout_rate)
+        autoencoder.fit(numeric_df, numeric_df,
+                        epochs=default_epochs,
+                        batch_size=32,
+                        shuffle=True,
+                        verbose=0)
         reconstructions = autoencoder.predict(numeric_df)
         mse = np.mean(np.square(numeric_df - reconstructions), axis=1)
 
-        # --- Show MSE Distribution ---
-        st.subheader("Step 1: Reconstruction Error (MSE) Histogram")
+        # IQR thresholding
+        q1, q3 = np.percentile(mse, [25, 75])
+        iqr = q3 - q1
+        upper_bound = q3 + default_iqr_multiplier * iqr
+        anomalies = mse > upper_bound
+
+        st.write(f"**Total anomalies detected:** {np.sum(anomalies)}")
+        st.dataframe(df.loc[anomalies])
+
+        # Histogram
         fig, ax = plt.subplots()
         ax.hist(mse, bins=50)
+        ax.axvline(upper_bound, color='r', linestyle='--')
         ax.set_title("Autoencoder Reconstruction Error Histogram")
         st.pyplot(fig)
 
-        # --- Check Normality ---
-        st.subheader("Step 2: Check MSE Normality")
-        from scipy.stats import shapiro
-        stat, p = shapiro(mse)
-        st.write(f"Shapiro-Wilk Test: W={stat:.4f}, p-value={p:.4f}")
-        if p > 0.05:
-            st.success("The MSE distribution appears normal (p > 0.05).")
-        else:
-            st.warning("The MSE distribution is not normal (p <= 0.05).")
-
-        # --- Choose Thresholding Method ---
-        st.subheader("Step 3: Choose Thresholding Method")
-        method = st.radio("Select thresholding method:", ["Z-score", "IQR"])
-
-        threshold = None
-        if method == "Z-score":
-            from scipy.stats import zscore
-            mse_z = zscore(mse)
-            threshold_z = st.slider("Z-score Threshold", min_value=1.0, max_value=5.0, value=3.0, step=0.1)
-            anomalies = mse_z > threshold_z
-            threshold = threshold_z
-        elif method == "IQR":
-            q1 = np.percentile(mse, 25)
-            q3 = np.percentile(mse, 75)
-            iqr = q3 - q1
-            iqr_factor = st.slider("IQR Multiplier", min_value=1.0, max_value=5.0, value=1.5, step=0.1)
-            upper_bound = q3 + iqr_factor * iqr
-            anomalies = mse > upper_bound
-            threshold = upper_bound
-
-        # --- Show Anomalies ---
-        st.subheader("Step 4: Detected Anomalies")
-        st.write(f"Total anomalies detected: {np.sum(anomalies)}")
-        st.dataframe(df.loc[anomalies])
-
-        # --- Download ---
+        # Download
         if st.button(T("Download") + " CSV - Autoencoder Anomalies"):
             csv = df.loc[anomalies].to_csv(index=False).encode()
             st.download_button(label=T("Download"), data=csv,
                                file_name='autoencoder_anomalies.csv',
                                mime='text/csv')
+
+    elif mode == "Change Parameters":
+        with st.expander("🔧 Adjust Hyperparameters"):
+            encoding_dim = st.slider(T("Encoding Dimension"), min_value=2, max_value=64, value=default_encoding_dim)
+            dropout_rate = st.slider(T("Dropout Rate"), 0.0, 0.5, default_dropout_rate)
+            epochs = st.slider(T("Epochs"), 5, 100, default_epochs)
+
+        if st.button("🔍 Detect Anomalies Based on Parameters"):
+            autoencoder = build_autoencoder(numeric_df.shape[1], encoding_dim, dropout_rate)
+            autoencoder.fit(numeric_df, numeric_df,
+                            epochs=epochs,
+                            batch_size=32,
+                            shuffle=True,
+                            verbose=0)
+            reconstructions = autoencoder.predict(numeric_df)
+            mse = np.mean(np.square(numeric_df - reconstructions), axis=1)
+
+            # Histogram
+            st.subheader("🔧 Reconstruction Error (MSE) Histogram")
+            fig, ax = plt.subplots()
+            ax.hist(mse, bins=50)
+            ax.set_title("Autoencoder Reconstruction Error Histogram")
+            st.pyplot(fig)
+
+            # Normality check
+            st.subheader("📈 Check MSE Normality")
+            from scipy.stats import shapiro
+            stat, p = shapiro(mse)
+            st.write(f"Shapiro-Wilk Test: W={stat:.4f}, p-value={p:.4f}")
+            if p > 0.05:
+                st.success("MSE distribution appears normal (p > 0.05).")
+            else:
+                st.warning("MSE distribution is not normal (p ≤ 0.05).")
+
+            # Thresholding
+            st.subheader("📏 Choose Thresholding Method")
+            method = st.radio("Select thresholding method:", ["Z-score", "IQR"])
+            if method == "Z-score":
+                from scipy.stats import zscore
+                mse_z = zscore(mse)
+                threshold_z = st.slider("Z-score Threshold", min_value=1.0, max_value=5.0, value=3.0, step=0.1)
+                anomalies = mse_z > threshold_z
+            elif method == "IQR":
+                q1, q3 = np.percentile(mse, [25, 75])
+                iqr = q3 - q1
+                iqr_factor = st.slider("IQR Multiplier", min_value=1.0, max_value=5.0, value=1.5, step=0.1)
+                upper_bound = q3 + iqr_factor * iqr
+                anomalies = mse > upper_bound
+
+            # Show results
+            st.subheader("🔎 Detected Anomalies")
+            st.write(f"**Total anomalies detected:** {np.sum(anomalies)}")
+            st.dataframe(df.loc[anomalies])
+
+            # Download
+            if st.button(T("Download") + " CSV - Autoencoder Anomalies"):
+                csv = df.loc[anomalies].to_csv(index=False).encode()
+                st.download_button(label=T("Download"), data=csv,
+                                   file_name='autoencoder_anomalies.csv',
+                                   mime='text/csv')
 
 
 
