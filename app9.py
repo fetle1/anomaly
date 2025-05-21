@@ -525,6 +525,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
                    fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
            st.plotly_chart(fig)
     elif detection_method == "Statistical":
+        import plotly.express as px
         numeric_cols = df.select_dtypes(include='number').columns.tolist()
         selected_var = st.selectbox("Select numeric variable to analyze", numeric_cols)
     
