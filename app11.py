@@ -151,7 +151,7 @@ def preprocessing():
     if df is None:
         st.warning(T("Upload") + " your dataset first.")
         return
-    st.subheader(T(Data Cleaning))
+    st.subheader(T("Data Cleaning"))
     df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
 
 # Map sex to standardized values
