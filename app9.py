@@ -442,7 +442,7 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
         csv = anomaly_df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Rule-Based Anomalies", data=csv, file_name="rule_based_anomalies.csv", mime="text/csv")
 
-    elif detection_method == "Autoencoder":
+   elif detection_method == "Autoencoder":
         batch_size = 32
         dropout_rate = 0.0
         encoding_dim = 16
@@ -529,44 +529,44 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
             else:
                 fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
         st.plotly_chart(fig)
-elif detection_method == "Statistical":
-    numeric_cols = df.select_dtypes(include='number').columns.tolist()
-    selected_var = st.selectbox("Select numeric variable to analyze", numeric_cols)
-
-    st.markdown("### Distribution Overview")
-    fig_hist = px.histogram(df, x=selected_var, nbins=50, title=f"{selected_var} Distribution")
-    st.plotly_chart(fig_hist)
-
-    stat_method = st.radio("Select statistical method", ["Z-score", "Median", "IQR"])
-
-    if stat_method == "Z-score":
-        from scipy.stats import zscore
-        z_scores = zscore(df[selected_var].dropna())
-        threshold = st.slider("Z-score Threshold", 0.0, 5.0, 3.0)
-        anomaly_mask = np.abs(z_scores) > threshold
-        anomaly_df = df.loc[anomaly_mask].copy()
-        anomaly_df["Reason"] = f"Z-score > {threshold}"
-
-    elif stat_method == "Median":
-        threshold = st.slider("Absolute Difference from Median", 0.0, float(df[selected_var].std()), 1.0)
-        anomaly_mask = abs(df[selected_var] - df[selected_var].median()) > threshold
-        anomaly_df = df[anomaly_mask].copy()
-        anomaly_df["Reason"] = f"Deviation > {threshold} from Median"
-
-    elif stat_method == "IQR":
-        multiplier = st.slider("IQR Multiplier", 1.0, 3.0, 1.5)
-        q1 = df[selected_var].quantile(0.25)
-        q3 = df[selected_var].quantile(0.75)
-        iqr = q3 - q1
-        lower = q1 - multiplier * iqr
-        upper = q3 + multiplier * iqr
-        anomaly_mask = (df[selected_var] < lower) | (df[selected_var] > upper)
-        anomaly_df = df[anomaly_mask].copy()
-        anomaly_df["Reason"] = f"Outside IQR x {multiplier}"
-
-    # Shared output logic (only runs if one of the methods was used)
-    st.markdown(f"**Detected {len(anomaly_df)} anomalies**")
-    st.dataframe(anomaly_df)
-
-    csv = anomaly_df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Statistical Anomalies", data=csv, file_name="statistical_anomalies.csv", mime="text/csv")
+    elif detection_method == "Statistical":
+        numeric_cols = df.select_dtypes(include='number').columns.tolist()
+        selected_var = st.selectbox("Select numeric variable to analyze", numeric_cols)
+    
+        st.markdown("### Distribution Overview")
+        fig_hist = px.histogram(df, x=selected_var, nbins=50, title=f"{selected_var} Distribution")
+        st.plotly_chart(fig_hist)
+    
+        stat_method = st.radio("Select statistical method", ["Z-score", "Median", "IQR"])
+    
+        if stat_method == "Z-score":
+            from scipy.stats import zscore
+            z_scores = zscore(df[selected_var].dropna())
+            threshold = st.slider("Z-score Threshold", 0.0, 5.0, 3.0)
+            anomaly_mask = np.abs(z_scores) > threshold
+            anomaly_df = df.loc[anomaly_mask].copy()
+            anomaly_df["Reason"] = f"Z-score > {threshold}"
+    
+        elif stat_method == "Median":
+            threshold = st.slider("Absolute Difference from Median", 0.0, float(df[selected_var].std()), 1.0)
+            anomaly_mask = abs(df[selected_var] - df[selected_var].median()) > threshold
+            anomaly_df = df[anomaly_mask].copy()
+            anomaly_df["Reason"] = f"Deviation > {threshold} from Median"
+    
+        elif stat_method == "IQR":
+            multiplier = st.slider("IQR Multiplier", 1.0, 3.0, 1.5)
+            q1 = df[selected_var].quantile(0.25)
+            q3 = df[selected_var].quantile(0.75)
+            iqr = q3 - q1
+            lower = q1 - multiplier * iqr
+            upper = q3 + multiplier * iqr
+            anomaly_mask = (df[selected_var] < lower) | (df[selected_var] > upper)
+            anomaly_df = df[anomaly_mask].copy()
+            anomaly_df["Reason"] = f"Outside IQR x {multiplier}"
+    
+        # Shared output logic (only runs if one of the methods was used)
+        st.markdown(f"**Detected {len(anomaly_df)} anomalies**")
+        st.dataframe(anomaly_df)
+    
+        csv = anomaly_df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Statistical Anomalies", data=csv, file_name="statistical_anomalies.csv", mime="text/csv")
