@@ -467,14 +467,14 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
            if dropout_rate > 0:
                encoded = Dropout(dropout_rate)(encoded)
            decoded = Dense(input_dim, activation='linear')(encoded)
-                    autoencoder = Model(inputs=input_layer, outputs=decoded)
+           autoencoder = Model(inputs=input_layer, outputs=decoded)
            autoencoder.compile(optimizer='adam', loss='mse')
            autoencoder.fit(X_scaled, X_scaled, epochs=epochs, batch_size=batch_size, shuffle=True, verbose=0)
         
            # Get reconstruction error
            X_pred = autoencoder.predict(X_scaled)
            mse = np.mean(np.square(X_scaled - X_pred), axis=1)
-                    st.markdown("### MSE Distribution (Reconstruction Error)")
+           st.markdown("### MSE Distribution (Reconstruction Error)")
            mse_df = pd.DataFrame({'Reconstruction Error': mse})
            fig_mse = px.histogram(mse_df, x='Reconstruction Error', nbins=50, title="Reconstruction Error Distribution")
            st.plotly_chart(fig_mse)
