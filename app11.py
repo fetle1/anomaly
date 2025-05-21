@@ -96,6 +96,18 @@ def T(text):
     return translations.get(lang, translations["en"]).get(text, text)
 
 # Page config
+def initialize_session_state():
+    defaults = {
+        "upload_complete": False,
+        "preprocessing_complete": False,
+        "data": None,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+# Call early in app
+initialize_session_state()
 
 
 # Sidebar language selector
