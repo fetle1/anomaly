@@ -246,7 +246,7 @@ def preprocessing():
     st.pyplot(plt.gcf())
     plt.clf()
 
-    # --- MISSINGNESS MECHANISM TEST ---
+    
     
     # --- GLOBAL MISSING DATA STRATEGY ---
     st.subheader(T("Global Missing Data Handling Strategy"))
@@ -255,6 +255,9 @@ def preprocessing():
 
     # --- COLUMN-WISE IMPUTATION ---
     st.subheader(T("Imputation per Column"))
+   
+    numeric_cols_with_na = [col for col in df.select_dtypes(include='number').columns if df[col].isna().any()]
+
     for col in numeric_cols_with_na:
         col_method = st.selectbox(f"{T('Imputation method for')} {col}",
                                   ["Default (Global)", "Mean", "Median", "Mode", "KNN", "Drop Row"],
