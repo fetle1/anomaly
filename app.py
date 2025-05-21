@@ -3,500 +3,628 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import io
+import missingno as msno
 from sklearn.impute import KNNImputer
-from sklearn.preprocessing import LabelEncoder
-import random
-import os
-import re # Import regular expressions for cleaning
+from scipy import stats
+from sklearn.ensemble import IsolationForest
+from scipy.stats import shapiro
+from sklearn.covariance import MinCovDet
+import plotly.express as px
+import tensorflow as tf
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, Dropout
 
-# Set Streamlit page config
-st.set_page_config(page_title="Health Data Analyzer", layout="wide")
-
-# Custom UI Styling (optional, keep it simple for now)
-st.markdown("""
-<style>
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        font-size: 1.2rem;
+st.set_page_config(page_title="Anomaly Detection App", layout="wide")
+# Translation dictionary
+translations = {
+    "en": {
+        "Upload": "Upload",
+        "Data Overview": "Data Overview",
+        "Preprocessing": "Preprocessing",
+        "Missing Data Analysis": "Missing Data Analysis",
+        "Anomaly Detection": "Anomaly Detection",
+        "Standard/Basic": "Standard/Basic",
+        "Advanced": "Advanced",
+        "Next ➡": "Next ➡",
+        "⬅ Back": "⬅ Back",
+        "Download": "📥 Download",
+        "No anomalies": "No anomalies detected.",
+        "Anomalies found": "{} anomalies found",
+        "Select a column to visualize": "Select a column to visualize",
+        "Select detection method": "Select detection method",
+        "Encoding Dimension": "Encoding Dimension",
+        "Dropout Rate": "Dropout Rate",
+        "Epochs": "Epochs",
+        "Threshold": "Threshold",
+        "Train Autoencoder": "Train Autoencoder",
+        "Autoencoder Reconstruction Error Histogram": "Autoencoder Reconstruction Error Histogram",
+        "Rule-based Anomaly Detection": "Rule-based Anomaly Detection",
+        "Detected anomalies:": "Detected anomalies:",
+    },
+    "sw": {
+        "Upload": "Pakia",
+        "Data Overview": "Muhtasari wa Data",
+        "Preprocessing": "Usafishaji",
+        "Missing Data Analysis": "Uchanganuzi wa Upungufu",
+        "Anomaly Detection": "Ugunduzi wa Shida",
+        "Standard/Basic": "Kawaida/Msingi",
+        "Advanced": "Kisasa",
+        "Next ➡": "Ifuatayo ➡",
+        "⬅ Back": "⬅ Nyuma",
+        "Download": "📥 Pakua",
+        "No anomalies": "Hakuna shida zilizogunduliwa.",
+        "Anomalies found": "{} shida zimegunduliwa",
+        "Select a column to visualize": "Chagua safu ya kuonyesha",
+        "Select detection method": "Chagua njia ya ugunduzi",
+        "Encoding Dimension": "Kipimo cha Uthibitishaji",
+        "Dropout Rate": "Kiwango cha Kukosa",
+        "Epochs": "Vipindi",
+        "Threshold": "Kiwango cha Kuingilia",
+        "Train Autoencoder": "Fanya Mafunzo ya Autoencoder",
+        "Autoencoder Reconstruction Error Histogram": "Histogramu ya Makosa ya Ujenzi wa Autoencoder",
+        "Rule-based Anomaly Detection": "Ugunduzi wa Shida kwa Kanuni",
+        "Detected anomalies:": "Shida zilizogunduliwa:",
+    },
+    "fr": {
+        "Upload": "Téléverser",
+        "Data Overview": "Vue d'ensemble des données",
+        "Preprocessing": "Prétraitement",
+        "Missing Data Analysis": "Analyse des données manquantes",
+        "Anomaly Detection": "Détection d'anomalies",
+        "Standard/Basic": "Standard/Basique",
+        "Advanced": "Avancé",
+        "Next ➡": "Suivant ➡",
+        "⬅ Back": "⬅ Retour",
+        "Download": "📥 Télécharger",
+        "No anomalies": "Aucune anomalie détectée.",
+        "Anomalies found": "{} anomalies détectées",
+        "Select a column to visualize": "Sélectionnez une colonne à visualiser",
+        "Select detection method": "Sélectionnez la méthode de détection",
+        "Encoding Dimension": "Dimension de codage",
+        "Dropout Rate": "Taux d'abandon",
+        "Epochs": "Époques",
+        "Threshold": "Seuil",
+        "Train Autoencoder": "Entraîner l'Autoencodeur",
+        "Autoencoder Reconstruction Error Histogram": "Histogramme des erreurs de reconstruction de l'autoencodeur",
+        "Rule-based Anomaly Detection": "Détection d'anomalies basée sur des règles",
+        "Detected anomalies:": "Anomalies détectées :",
     }
-</style>
-""", unsafe_allow_html=True)
+}
+
+def T(text):
+    lang = st.session_state.get("language", "en")
+    return translations.get(lang, translations["en"]).get(text, text)
+
+# Page config
+def initialize_session_state():
+    defaults = {
+        "upload_complete": False,
+        "preprocessing_complete": False,
+        "data": None,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+# Call early in app
+initialize_session_state()
 
 
-st.title("Health Data Analyzer")
+# Sidebar language selector
+lang = st.sidebar.selectbox("🌐 Language / Lugha / Langue", ["en", "sw", "fr"], format_func=lambda x: translations[x]["Upload"])
+st.session_state["language"] = lang
 
-# Use tabs for navigation
-tab1, tab2, tab3, tab4, tab5 = st.tabs([" Upload Data", " Data Overview", " Data Preprocessing", " Missing Data Analysis", " Data Imputation"])
+# Initialize session state
+if 'data' not in st.session_state:
+    st.session_state.data = None
+if 'anomalies' not in st.session_state:
+    st.session_state.anomalies = {}
 
+# --- Upload tab ---
 
-with tab1:
-    st.subheader("Upload your data")
-    uploaded_file = st.file_uploader("Upload your dataset (CSV, XLSX)", type=["csv", "xlsx"])
+def upload_data():
+    st.header("Upload")
+    uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
     if uploaded_file:
+        df = pd.read_csv(uploaded_file)  # or pd.read_excel
+        st.session_state.data = df
+        st.session_state.upload_complete = True
+        st.success("Data uploaded successfully!")
+
+# --- Data overview tab ---
+def data_overview():
+    st.header(T("Data Overview"))
+    df = st.session_state.data
+    if df is None:
+        st.warning(T("Upload") + " your dataset first.")
+        return
+
+    st.subheader(T("Column Types"))
+    type_info = pd.DataFrame({"Column": df.columns, "Current Type": [df[col].dtype for col in df.columns]})
+    st.dataframe(type_info)
+
+    st.subheader(T("Summary Statistics (Numerical Variables)"))
+    st.dataframe(df.describe())
+
+    st.subheader(T("Select a column to visualize"))
+    selected_column = st.selectbox(T("Select a column to visualize"), df.columns)
+    if selected_column:
+        if pd.api.types.is_numeric_dtype(df[selected_column]):
+            fig, ax = plt.subplots()
+            sns.histplot(df[selected_column].dropna(), kde=True, ax=ax)
+            st.pyplot(fig)
+        else:
+            fig = px.histogram(df, x=selected_column)
+            st.plotly_chart(fig)
+# Clean column names
+
+# --- Preprocessing tab ---
+def preprocessing():
+    st.header("Preprocessing")
+
+    if not st.session_state.upload_complete:
+        st.warning("Please upload data first.")
+        return
+
+    df = st.session_state.data
+
+    # --- DATA CLEANING ---
+    st.subheader(T("Data Cleaning"))
+    changes = []
+
+    df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+    changes.append("Stripped and standardized column names")
+
+    gender_columns = [col for col in df.columns if 'gender' in col]
+    for col in gender_columns:
+        df.rename(columns={col: 'sex'}, inplace=True)
+        changes.append(f"Renamed column '{col}' to 'sex'")
+
+    if 'age' not in df.columns:
+        age_columns = [col for col in df.columns if 'age' in col]
+        if age_columns:
+            df.rename(columns={age_columns[0]: 'age'}, inplace=True)
+            changes.append(f"Renamed column '{age_columns[0]}' to 'age'")
+
+    if changes:
+        st.write("✅ Cleaning steps applied:")
+        for change in changes:
+            st.markdown(f"- {change}")
+    else:
+        st.info("No automatic cleaning changes were made.")
+
+    st.session_state.data = df
+
+    # --- VARIABLE TYPE CONVERSION ---
+    st.subheader("🔄 Variable Type Conversion")
+    selected_type_col = st.selectbox("Select a column to change its type", df.columns)
+    current_dtype = df[selected_type_col].dtype
+
+    target_dtype = st.selectbox(
+        f"Convert column '{selected_type_col}' from {current_dtype} to:",
+        ["int", "float", "str", "bool", "category"]
+    )
+
+    if st.button("Apply Type Conversion"):
         try:
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            elif uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file)
-            st.session_state["df"] = df.copy() # Store a copy of the original data
-            st.session_state["df_processed"] = None # Reset processed data on new upload
-            st.session_state["df_imputed"] = None # Reset imputed data on new upload
-            st.success(" Data uploaded successfully!")
-            st.write("First 5 rows of the uploaded data:")
-            st.dataframe(df.head())
+            df[selected_type_col] = df[selected_type_col].astype(target_dtype)
+            st.success(f"✅ Converted column '{selected_type_col}' to type '{target_dtype}'")
         except Exception as e:
-            st.error(f"Error uploading file: {e}")
+            st.error(f"❌ Conversion failed: {e}")
 
-with tab2:
-    st.subheader("Data Overview")
+    st.session_state.data = df
 
-    if uploaded_file:
+    # --- DROP COLUMNS ---
+    st.subheader("🗑️ Drop Variables")
+    columns_to_drop = st.multiselect("Select columns to drop from the dataset", df.columns)
+
+    if columns_to_drop and st.button("Drop Selected Columns"):
+        df.drop(columns=columns_to_drop, inplace=True)
+        st.success(f"✅ Dropped columns: {', '.join(columns_to_drop)}")
+        st.session_state.data = df
+
+    # --- ENCODING CATEGORICAL VARIABLES ---
+    st.subheader("🔁 Encode Categorical Variables")
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+
+    if categorical_cols:
+        selected_col = st.selectbox("Choose a categorical column to encode", categorical_cols)
+        encoding_type = st.radio(
+            "Select encoding type",
+            ["Label Encoding (Ordinal)", "One-Hot Encoding (Nominal)"]
+        )
+
+        if encoding_type and st.button("Apply Encoding"):
+            if encoding_type.startswith("Label"):
+                le = LabelEncoder()
+                df[selected_col] = le.fit_transform(df[selected_col].astype(str))
+                st.success(f"✅ Label encoding applied to '{selected_col}'")
+            elif encoding_type.startswith("One-Hot"):
+                df = pd.get_dummies(df, columns=[selected_col], drop_first=True)
+                st.success(f"✅ One-hot encoding applied to '{selected_col}'")
+
+        st.warning("💡 Use Label Encoding for **ordinal** variables and One-Hot Encoding for **nominal** ones.")
+    else:
+        st.info("No categorical columns found for encoding.")
+
+    st.session_state.data = df
+
+    # --- MISSING DATA ANALYSIS ---
+    st.subheader(T("Missing Data Analysis"))
+    st.write(df.isnull().sum())
+
+    st.markdown("### Missing Data Pattern")
+    msno.matrix(df)
+    st.pyplot(plt.gcf())
+    plt.clf()
+
+    
+    
+    # --- GLOBAL MISSING DATA STRATEGY ---
+    st.subheader(T("Global Missing Data Handling Strategy"))
+    global_method = st.selectbox("Choose a default imputation method for all variables",
+                                 ["None", "Mean", "Median", "Mode", "KNN", "Drop Row"])
+
+    # --- COLUMN-WISE IMPUTATION ---
+    st.subheader(T("Imputation per Column"))
+   
+    numeric_cols_with_na = [col for col in df.select_dtypes(include='number').columns if df[col].isna().any()]
+
+    for col in numeric_cols_with_na:
+        col_method = st.selectbox(f"{T('Imputation method for')} {col}",
+                                  ["Default (Global)", "Mean", "Median", "Mode", "KNN", "Drop Row"],
+                                  key=col)
+
+        if st.button(f"Apply {col_method} to {col}", key="btn_" + col):
+            method_to_apply = global_method if col_method == "Default (Global)" else col_method
+
+            if method_to_apply == "Mean" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].mean(), inplace=True)
+            elif method_to_apply == "Median" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].median(), inplace=True)
+            elif method_to_apply == "Mode":
+                df[col].fillna(df[col].mode()[0], inplace=True)
+            elif method_to_apply == "KNN":
+                knn = KNNImputer()
+                df[df.columns] = knn.fit_transform(df)
+            elif method_to_apply == "Drop Row":
+                df.dropna(subset=[col], inplace=True)
+            elif method_to_apply == "None":
+                pass  # Do nothing
+
+            st.success(f"{method_to_apply} imputation applied to {col}")
+
+    st.session_state.data = df
+    st.session_state.preprocessing_complete = True
+def detect_rule_based_anomalies(df):
+    df = df.copy()
+    anomalies = pd.Series([False] * len(df), index=df.index)
+    reasons = {i: [] for i in df.index}  # Dictionary to track reasons for each row
+
+    def col_exists(*cols):
+        return all(col in df.columns for col in cols)
+
+    # Clean up types
+    df["systolic_bp"] = pd.to_numeric(df.get("systolic_bp", pd.NA), errors="coerce")
+    df["diastolic_bp"] = pd.to_numeric(df.get("diastolic_bp", pd.NA), errors="coerce")
+
+    if col_exists('hemoglobin'):
+        condition = df['hemoglobin'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Hemoglobin ≤ 0")
+
+    if col_exists('glucose'):
+        condition = df['glucose'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Glucose ≤ 0")
+
+    if col_exists('spo2'):
+        condition = df['spo2'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("SpO2 ≤ 0")
+
+    if col_exists('systolic_bp', 'diastolic_bp'):
+        condition = df['diastolic_bp'] > df['systolic_bp']
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Diastolic BP > Systolic BP")
+
+    if col_exists('sex', 'pregnant'):
+        condition = (df['sex'].astype(str).str.lower() == 'male') & (df['pregnant'] == True)
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Male marked as pregnant")
+
+    if col_exists('sex', 'bph'):
+        condition = (df['sex'].astype(str).str.lower() == 'female') & (df['bph'] == True)
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Female marked as having BPH")
+
+    if col_exists('age', 'pregnant'):
+        condition_young = (df['age'] < 5) & (df['pregnant'] == True)
+        condition_old = (df['age'] > 70) & (df['pregnant'] == True)
+        anomalies |= condition_young | condition_old
+        for i in df[condition_young].index:
+            reasons[i].append("Pregnant but age < 5")
+        for i in df[condition_old].index:
+            reasons[i].append("Pregnant but age > 70")
+
+    if col_exists('dob', 'dod'):
+        dob = pd.to_datetime(df['dob'], errors='coerce')
+        dod = pd.to_datetime(df['dod'], errors='coerce')
+        condition = dob > dod
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("DOB after DOD")
+
+    if col_exists('admission_date', 'discharge_date'):
+        adm = pd.to_datetime(df['admission_date'], errors='coerce')
+        dis = pd.to_datetime(df['discharge_date'], errors='coerce')
+        condition = dis < adm
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Discharge before admission")
+
+    if col_exists('pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy', 'sex'):
+        condition_f = (df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'] == 3) & \
+                      (df['sex'].astype(str).str.upper() == 'F')
+        condition_m = df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'].isin([1, 2]) & \
+                      (df['sex'].astype(str).str.upper() == 'M')
+        anomalies |= condition_f | condition_m
+        for i in df[condition_f].index:
+            reasons[i].append("Female marked as death due to pregnancy-related cause (code 3)")
+        for i in df[condition_m].index:
+            reasons[i].append("Male marked as pregnant/death related to pregnancy (code 1/2)")
+
+    if col_exists('age', 'dob', 'dod'):
         try:
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            elif uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file)
-
-            st.session_state["df"] = df.copy()
-            st.session_state["df_processed"] = None
-            st.session_state["df_imputed"] = None
-            st.success("Data uploaded successfully!")
-
+            yob = pd.to_datetime(df['dob'], errors='coerce').dt.year
+            yod = pd.to_datetime(df['dod'], errors='coerce').dt.year
+            age_calc = yod - yob
+            age = pd.to_numeric(df['age'], errors='coerce')
+            condition = age != age_calc
+            anomalies |= condition
+            for i in df[condition].index:
+                reasons[i].append("Reported age does not match DOB-DOD")
         except Exception as e:
-            st.error(f"Error uploading file: {e}")
+            print(f"Error in age calculation: {e}")
 
-    # Only proceed if a DataFrame is available in session
-    if "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state.get("df_processed") or st.session_state.get("df")
+    reasons_final = {i: "; ".join(reasons[i]) for i in df[anomalies].index}
+    return anomalies, reasons_final
 
-        if df is not None:
-            st.subheader("Data Preview")
-            st.dataframe(df.head())
 
-            st.subheader("Data Types")
-            st.write(df.dtypes)
+# --- Basic anomaly detection ---
+def basic_anomaly_detection():
+    st.header(T("Standard/Basic"))
 
-            st.subheader("Summary Statistics")
-            st.write(df.describe(include='all'))
+    if not st.session_state.preprocessing_complete:
+        st.warning("Please complete preprocessing first.")
+        return
 
-            st.subheader("Column Distribution Visualization")
-            column = st.selectbox("Select a column to visualize", df.columns, key='overview_column_select')
+    df = st.session_state.data
+    numeric_df = df.select_dtypes(include=np.number)
 
-            if column:
-                fig, ax = plt.subplots()
-                if pd.api.types.is_numeric_dtype(df[column]):
-                    sns.histplot(df[column].dropna(), kde=True, ax=ax)
-                    ax.set_title(f'Distribution of {column}')
-                elif pd.api.types.is_object_dtype(df[column]) or pd.api.types.is_categorical_dtype(df[column]):
-                    series = df[column].dropna().astype(str)
-                    if not series.empty:
-                        sns.countplot(y=series, ax=ax)
-                        ax.set_title(f'Count of {column}')
-                    else:
-                        st.warning(f"No non-null values in column '{column}' to plot.")
-                else:
-                    st.info(f"Column '{column}' has a non-visualizable dtype.")
-                st.pyplot(fig)
+    method = st.selectbox(T("Select detection method"), 
+                          ["Z-score", "IQR", "Median Absolute Deviation", "Mahalanobis Distance", "Rule-based"])
+    outliers = pd.Series(False, index=df.index)
+    reasons = {}
+
+    if method == "Z-score":
+        threshold = st.slider("Z-score Threshold", 2.0, 5.0, 3.0)
+        z_scores = np.abs(stats.zscore(numeric_df))
+        outliers = (z_scores > threshold).any(axis=1)
+
+    elif method == "IQR":
+        q1 = numeric_df.quantile(0.25)
+        q3 = numeric_df.quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        outliers = ((numeric_df < lower_bound) | (numeric_df > upper_bound)).any(axis=1)
+
+    elif method == "Median Absolute Deviation":
+        med = numeric_df.median()
+        mad = (np.abs(numeric_df - med)).median()
+        threshold = st.slider("MAD Threshold", 2.0, 5.0, 3.0)
+        mad_score = np.abs(numeric_df - med) / mad
+        outliers = (mad_score > threshold).any(axis=1)
+
+    elif method == "Mahalanobis Distance":
+        robust_cov = MinCovDet().fit(numeric_df)
+        mahal_dist = robust_cov.mahalanobis(numeric_df)
+        threshold = st.slider("Mahalanobis Distance Threshold", float(np.percentile(mahal_dist, 90)),
+                              float(np.max(mahal_dist)), float(np.percentile(mahal_dist, 95)))
+        outliers = mahal_dist > threshold
+
+    elif method == "Rule-based":
+        outliers, reasons = detect_rule_based_anomalies(df)
+
+    st.write(f"{T('Anomalies found')}: {outliers.sum()}")
+
+    if method == "Rule-based" and reasons:
+        df_outliers = df[outliers].copy()
+        df_outliers["reason"] = df_outliers.index.map(reasons)
+        st.dataframe(df_outliers)
+    else:
+        st.dataframe(df.loc[outliers])
+
+    if st.button(T("Download") + " CSV - Basic Anomalies"):
+        if method == "Rule-based" and reasons:
+            csv = df_outliers.to_csv(index=False).encode()
+        else:
+            csv = df.loc[outliers].to_csv(index=False).encode()
+        st.download_button(label=T("Download"), data=csv, file_name='basic_anomalies.csv', mime='text/csv')
+
+
+def autoencoder_anomaly_detection():
+    st.header(T("Advanced") + " - Autoencoder")
+
+    if not st.session_state.get("preprocessing_complete", False):
+        st.warning("Please complete preprocessing first.")
+        return
+
+    df = st.session_state.data
+    numeric_df = df.select_dtypes(include=[np.number]).dropna()
+
+    if numeric_df.empty:
+        st.warning("No numeric columns available for autoencoder.")
+        return
+
+    # --- Top-level Option ---
+    mode = st.radio("Choose Action", ["Detect Anomalies", "Change Parameters"])
+
+    # --- Default Hyperparameters ---
+    default_encoding_dim = 16
+    default_dropout_rate = 0.0
+    default_epochs = 20
+    default_iqr_multiplier = 2.5
+    default_z_threshold = 3.0
+
+    # --- Autoencoder Builder ---
+    def build_autoencoder(input_dim, encoding_dim, dropout_rate):
+        input_layer = Input(shape=(input_dim,))
+        encoded = Dense(encoding_dim, activation="relu")(input_layer)
+        if dropout_rate > 0:
+            encoded = Dropout(dropout_rate)(encoded)
+        decoded = Dense(input_dim, activation="linear")(encoded)
+        autoencoder = Model(inputs=input_layer, outputs=decoded)
+        autoencoder.compile(optimizer='adam', loss='mse')
+        return autoencoder
+
+    # --- Simple Mode ---
+    if mode == "Detect Anomalies":
+        st.subheader("🔍 Detected Anomalies (Default Settings)")
+        autoencoder = build_autoencoder(numeric_df.shape[1], default_encoding_dim, default_dropout_rate)
+        autoencoder.fit(numeric_df, numeric_df,
+                        epochs=default_epochs,
+                        batch_size=32,
+                        shuffle=True,
+                        verbose=0)
+        reconstructions = autoencoder.predict(numeric_df)
+        mse = np.mean(np.square(numeric_df - reconstructions), axis=1)
+
+        # IQR thresholding
+        q1, q3 = np.percentile(mse, [25, 75])
+        iqr = q3 - q1
+        upper_bound = q3 + default_iqr_multiplier * iqr
+        anomalies = mse > upper_bound
+
+        st.write(f"**Total anomalies detected:** {np.sum(anomalies)}")
+        st.dataframe(df.loc[anomalies])
+
+        # Histogram
+        fig, ax = plt.subplots()
+        ax.hist(mse, bins=50)
+        ax.axvline(upper_bound, color='r', linestyle='--', label='Upper IQR Threshold')
+        ax.set_title("Autoencoder Reconstruction Error Histogram")
+        ax.legend()
+        st.pyplot(fig)
+
+        # Download
+        if st.button(T("Download") + " CSV - Autoencoder Anomalies"):
+            csv = df.loc[anomalies].to_csv(index=False).encode()
+            st.download_button(label=T("Download"), data=csv,
+                               file_name='autoencoder_anomalies.csv',
+                               mime='text/csv')
+
+    # --- Parameter Tuning Mode ---
+    elif mode == "Change Parameters":
+        with st.expander("🔧 Adjust Hyperparameters"):
+            encoding_dim = st.slider(T("Encoding Dimension"), min_value=2, max_value=64, value=default_encoding_dim)
+            dropout_rate = st.slider(T("Dropout Rate"), 0.0, 0.5, default_dropout_rate)
+            epochs = st.slider(T("Epochs"), 5, 100, default_epochs)
+
+            # --- Thresholding Settings ---
+            st.markdown("### 📏 Thresholding Method")
+            method = st.radio("Select thresholding method:", ["Z-score", "IQR"], key="threshold_method")
+
+            if method == "Z-score":
+                z_threshold = st.slider("Z-score Threshold", min_value=1.0, max_value=5.0, value=default_z_threshold, step=0.1)
+            elif method == "IQR":
+                iqr_factor = st.slider("IQR Multiplier", min_value=1.0, max_value=5.0, value=default_iqr_multiplier, step=0.1)
+
+        if st.button("🔍 Detect Anomalies Based on Parameters"):
+            autoencoder = build_autoencoder(numeric_df.shape[1], encoding_dim, dropout_rate)
+            autoencoder.fit(numeric_df, numeric_df,
+                            epochs=epochs,
+                            batch_size=32,
+                            shuffle=True,
+                            verbose=0)
+            reconstructions = autoencoder.predict(numeric_df)
+            mse = np.mean(np.square(numeric_df - reconstructions), axis=1)
+
+            # Plot histogram
+            st.subheader("📊 Reconstruction Error Histogram")
+            fig, ax = plt.subplots()
+            ax.hist(mse, bins=50)
+            ax.set_title("Autoencoder Reconstruction Error (MSE)")
+            st.pyplot(fig)
+
+            # Normality test
+            st.subheader("📈 MSE Normality Test")
+            from scipy.stats import shapiro
+            stat, p = shapiro(mse)
+            st.write(f"Shapiro-Wilk Test: W={stat:.4f}, p-value={p:.4f}")
+            if p > 0.05:
+                st.success("MSE distribution appears normal (p > 0.05).")
             else:
-                st.info("Please select a column to visualize.")
-        else:
-            st.warning("No valid data to show.")
-    else:
-        st.warning("Please upload data first in the 'Upload Data' section.")
+                st.warning("MSE distribution is not normal (p ≤ 0.05).")
 
-with tab3:  # Preprocessing
-    st.sidebar.subheader("Preprocessing Options")
+            # Apply chosen threshold
+            if method == "Z-score":
+                from scipy.stats import zscore
+                mse_z = zscore(mse)
+                anomalies = mse_z > z_threshold
+            elif method == "IQR":
+                q1, q3 = np.percentile(mse, [25, 75])
+                iqr = q3 - q1
+                upper_bound = q3 + iqr_factor * iqr
+                anomalies = mse > upper_bound
 
-    if "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state["df"].copy() # Start with a fresh copy of the original data
+            # Results
+            st.subheader("🔎 Detected Anomalies")
+            st.write(f"**Total anomalies detected:** {np.sum(anomalies)}")
+            st.dataframe(df.loc[anomalies])
 
-        st.write("Current Data Head:")
-        st.dataframe(df.head())
-        st.write("Current Data Types:")
-        st.write(df.dtypes)
-
-        # Preprocessing Steps Configuration
-        st.sidebar.subheader("Preprocessing Options")
-        process_bp = st.sidebar.checkbox("Split 'BP' column (e.g., '120/80')", value=True)
-        clean_strings = st.sidebar.checkbox("Clean String Columns (remove spaces, empty strings, etc.)", value=True)
-        convert_to_category = st.sidebar.checkbox("Convert suitable object columns to 'category'", value=True)
-        identifier_cols_input = st.sidebar.text_input("Enter identifier columns (comma-separated)", "clinical_id,first_name,last_name,patient_id")
-        identifier_cols = [col.strip() for col in identifier_cols_input.split(',')]
-        columns_to_drop_input = st.sidebar.text_input("Enter columns to drop (comma-separated)", "")
-        columns_to_drop = [col.strip() for col in columns_to_drop_input.split(',') if col.strip()]
+            # Download
+            if st.button(T("Download") + " CSV - Autoencoder Anomalies"):
+                csv = df.loc[anomalies].to_csv(index=False).encode()
+                st.download_button(label=T("Download"), data=csv,
+                                   file_name='autoencoder_anomalies.csv',
+                                   mime='text/csv')
 
 
-        if st.button("Apply Preprocessing"):
-
-            # Step 1: Handle 'BP' column if it exists and is object type
-            if process_bp and 'BP' in df.columns and (pd.api.types.is_object_dtype(df['BP']) or pd.api.types.is_string_dtype(df['BP'])):
-                st.info("Processing 'BP' column...")
-                try:
-                    # Ensure the 'BP' column is treated as string type first
-                    df['BP'] = df['BP'].astype(str).str.strip() # Add strip to remove leading/trailing spaces
-
-                    # Identify rows that can be split
-                    splittable_rows = df['BP'].str.contains('/', na=False)
-
-                    # Split the 'BP' column into two new columns: 'Systolic_BP' and 'Diastolic_BP'
-                    # Apply split only to rows that contain '/'
-                    split_bp = df.loc[splittable_rows, 'BP'].str.split('/', expand=True)
-
-                    # Initialize new columns with NaN
-                    df['Systolic_BP'] = np.nan
-                    df['Diastolic_BP'] = np.nan
-
-                    # Assign split values
-                    if 0 in split_bp.columns:
-                        df.loc[splittable_rows, 'Systolic_BP'] = pd.to_numeric(split_bp[0], errors='coerce')
-                    if 1 in split_bp.columns:
-                         df.loc[splittable_rows, 'Diastolic_BP'] = pd.to_numeric(split_bp[1], errors='coerce')
-
-
-                    # Drop the original 'BP' column
-                    df = df.drop('BP', axis=1)
-                    st.success(" 'BP' column split into 'Systolic_BP' and 'Diastolic_BP'")
-                except Exception as e:
-                    st.error(f"Error processing 'BP' column: {e}")
-                    st.warning("Skipping 'BP' processing due to error.")
-
-            # Step 2: Clean String Columns
-            if clean_strings:
-                st.info("Cleaning string columns...")
-                for col in df.columns:
-                    # Check if the column is of object or category dtype
-                    if pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
-                         try:
-                            # Convert to string first to handle mixed types gracefully
-                            df[col] = df[col].astype(str)
-                            # Remove leading/trailing whitespace
-                            df[col] = df[col].str.strip()
-                            # Replace empty strings with NaN
-                            df[col] = df[col].replace('', np.nan)
-                            # Replace string 'nan' with actual NaN (if it exists as a string)
-                            df[col] = df[col].replace('nan', np.nan)
-                           # Convert to lowercase (optional)
-                            df[col] = df[col].str.lower()
-                         except Exception as e:
-                            st.warning(f"Could not clean string column '{col}': {e}")
-                st.success("String columns cleaned.")
-
-
-            # Step 3: Convert suitable object columns to 'category' type
-            st.sidebar.markdown("### Convert Variables")
-
-# Only show conversion table for non-identifier columns
-            editable_cols = [col for col in df.columns if col not in identifier_cols]
-            dtype_options = ["int", "float", "object", "category", "bool", "datetime"]
-            
-            # Create 3-column layout in sidebar
-            conversion_table = {}
-            for col in editable_cols:
-                current_dtype = df[col].dtype.name
-                st.sidebar.write(f"**{col}** (current: _{current_dtype}_)")
-                new_dtype = st.sidebar.selectbox(
-                    f"Change `{col}` to:",
-                    options=dtype_options,
-                    key=f"dtype_{col}",
-                    index=dtype_options.index(current_dtype) if current_dtype in dtype_options else 2
-                )
-                conversion_table[col] = new_dtype
-            
-            # Apply button
-            if st.sidebar.button("Apply Type Changes"):
-                for col, new_dtype in conversion_table.items():
-                    try:
-                        if new_dtype == "int":
-                            df[col] = df[col].astype(int)
-                        elif new_dtype == "float":
-                            df[col] = df[col].astype(float)
-                        elif new_dtype == "object":
-                            df[col] = df[col].astype(str)
-                        elif new_dtype == "category":
-                            df[col] = df[col].astype('category')
-                        elif new_dtype == "bool":
-                            df[col] = df[col].astype(bool)
-                        elif new_dtype == "datetime":
-                            df[col] = pd.to_datetime(df[col], errors='coerce')
-                        st.success(f"Converted `{col}` to {new_dtype}.")
-                    except Exception as e:
-                        st.error(f"Failed to convert `{col}` to {new_dtype}: {e}")
-            
-                # Save updated df back to session
-                st.session_state["df_processed"] = df.copy()
-            st.success("Object columns (excluding identifiers and those with too many unique values) converted to category dtype.")
-
-#thare seems to be a problem this code what should I do and take it as it is 
-
-            # Step 4: Drop specified columns
-            if columns_to_drop:
-                 st.info(f"Dropping columns: {', '.join(columns_to_drop)}")
-                 existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
-                 if existing_columns_to_drop:
-                    df = df.drop(columns=existing_columns_to_drop, errors='ignore')
-                    st.success(f"Dropped columns: {', '.join(existing_columns_to_drop)}")
-                 else:
-                    st.warning("None of the specified columns to drop were found in the DataFrame.")
-
-
-            st.write("Preprocessing complete. Updated DataFrame head:")
-            st.dataframe(df.head())
-            st.write("Updated Data Types:")
-            st.write(df.dtypes)
-            st.write("Updated Missing Value Count:")
-            st.write(df.isnull().sum())
-
-            # Store the processed DataFrame in session state
-            st.session_state["df_processed"] = processed_df  # after preprocessing is applied
-
-
-    else:
-        st.warning("Please upload data first in the 'Upload Data' tab.")
-
-
-with tab4:
-    st.subheader("Missing Data Analysis")
-     # Use df from session state, prioritize processed if available
-    if "df_processed" in st.session_state and st.session_state["df_processed"] is not None:
-        df = st.session_state["df_processed"]
-        st.info("Analyzing missing data for the processed dataset.")
-    elif "df" in st.session_state and st.session_state["df"] is not None:
-        df = st.session_state["df"]
-        st.warning("Data has not been preprocessed yet. Displaying missing data analysis for the raw data.")
-    else:
-        st.warning("Please upload data first in the 'Upload Data' tab.")
-        df = None # Ensure df is None if no data is loaded
-    if "df_processed" not in st.session_state or st.session_state["df_processed"] is None:
-        st.warning("Please preprocess the data first in the 'Data Preprocessing' tab before imputation.")
-        st.stop()
-
-    if df is not None:
-        st.subheader("📊 Missing Data Summary")
-        missing_pct = df.isnull().mean() * 100
-        missing_summary = missing_pct[missing_pct > 0].sort_values(ascending=False)
-
-        if not missing_summary.empty:
-            st.write("Percentage of missing values per column:")
-            st.dataframe(missing_summary.reset_index().rename(columns={'index': 'Column', 0: 'Missing Percentage (%)'}))
-
-            st.subheader(" Missingness Mechanism (Heuristic)")
-            st.info("Note: This is a heuristic analysis and requires domain knowledge for definitive determination.")
-            for col in missing_summary.index:
-                st.write(f"Column: **{col}**")
-                if pd.api.types.is_numeric_dtype(df[col]):
-                    numeric_df = df.select_dtypes(include=np.number)
-                    # Ensure the column exists in the numeric subset before calculating correlation
-                    if col in numeric_df.columns and len(numeric_df.columns) > 1: # Need at least two columns for correlation
-                        # Calculate absolute correlation with other numeric columns
-                        correlations = numeric_df.corr()[col].drop(col).abs()
-                        if not correlations.empty:
-                             corr = correlations.max()
-                             if corr > 0.3:
-                                 st.write("Likely MAR (Missing At Random) - High correlation with other numeric features.")
-                             else:
-                                 st.write("Possibly MCAR (Missing Completely At Random) - Low correlation with other numeric features.")
-                        else:
-                             st.write("Cannot determine mechanism for numeric column with no other numeric columns for correlation analysis.")
-
-                    else:
-                        st.write("Cannot determine mechanism for numeric column (no other numeric columns or only one numeric column).")
-
-                elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
-                    st.write("MNAR suspected (Missing Not At Random) - Categorical column, mechanism is often related to the missing value itself.")
-                else:
-                    st.write("Mechanism determination not implemented for this data type.")
-        else:
-            st.success("No missing data found in the dataset.")
 
 
    
-with tab5:  # Imputation
-    st.sidebar.subheader("Imputation Options")
-    # ... only imputation sidebar widgets here ...
-imputation_strategy = st.sidebar.radio(
-    "Choose Imputation Strategy",
-    (
-        "Default Strategy (rules by missing %)",
-        "Mean/Mode for all",
-        "Median/Mode for all",
-        "KNN for all",
-        "Drop rows with missing values"
-    )
-)
-if imputation_strategy == "Default Strategy (rules by missing %)":
-    # Use df from session state, prioritize processed if available
-    if "df_processed" in st.session_state and st.session_state["df_processed"] is not None:
-        df = st.session_state["df_processed"].copy() # Work on a copy for imputation
-        st.info("Applying imputation to the processed dataset.")
+# --- Main tabs ---
+tab_list = [
+    T("Upload"),
+    T("Data Overview"),
+    T("Preprocessing"),
+    T("Standard/Basic"),
+    T("Advanced")
+]
 
-        st.sidebar.subheader("Imputation Options")
-        drop_high_missing_cols = st.sidebar.checkbox("Drop columns with > 50% missing", value=True)
-        drop_low_missing_rows = st.sidebar.checkbox("Drop rows with < 1% missing in a column (if that column has < 5% total missing)", value=True)
-        impute_low_missing = st.sidebar.checkbox("Impute missing < 5% (Mean/Mode)", value=True)
-        impute_moderate_missing = st.sidebar.checkbox("Impute missing 5%-50% (KNN)", value=True)
-        knn_neighbors = st.sidebar.slider("KNN n_neighbors", 2, 10, 5)
+tabs = st.tabs(tab_list)
 
+with tabs[0]:
+    upload_data()
 
-        if st.button("Apply Imputation"):
-            st.write("Starting imputation process...")
-            initial_cols = df.columns.tolist() # Track columns before dropping
+with tabs[1]:
+    data_overview()
 
-            for col in initial_cols: # Iterate over initial columns to handle dropped ones
-                 if col not in df.columns: # Skip if column was dropped in a previous step
-                     continue
+with tabs[2]:
+    preprocessing()
 
-                 missing_pct = df[col].isnull().mean() * 100
-                 if missing_pct == 0:
-                     continue
+with tabs[3]:
+    basic_anomaly_detection()
 
-                 st.write(f" Processing column: `{col}` ({missing_pct:.1f}% missing)")
-
-                 # Strategy 1: Drop column/rows if too much missing data
-                 if drop_high_missing_cols and missing_pct > 50:
-                      st.warning(f"Column `{col}` has {missing_pct:.1f}% missing values. Dropping the column.")
-                      df = df.drop(col, axis=1)
-                      st.success(f"Dropped column: `{col}`")
-                      continue # Move to the next column
-
-                 # Strategy 2: Drop rows if a small percentage of rows have missing data in a column
-                 if drop_low_missing_rows and missing_pct < 5:
-                      missing_rows_count = df[col].isnull().sum()
-                      # Check if dropping these rows is a significant loss of data (e.g., less than 1% of total rows)
-                      if missing_rows_count / len(df) < 0.01:
-                           initial_row_count = len(df)
-                           df = df.dropna(subset=[col])
-                           rows_dropped = initial_row_count - len(df)
-                           if rows_dropped > 0:
-                                st.warning(f"Dropped {rows_dropped} rows with missing values in `{col}` (less than 1% of data).")
-                           else:
-                                st.info(f"No rows dropped for `{col}` despite low missing percentage.")
-                           continue # Move to the next column
-                      else:
-                            st.info(f"Column `{col}` has {missing_pct:.1f}% missing. Proceeding with imputation.")
+with tabs[4]:
+    autoencoder_anomaly_detection()
 
 
-                 # Strategy 3: Impute for small missing percentage (if not dropped rows)
-                 if impute_low_missing and missing_pct < 5 and drop_low_missing_rows == False:
-                      if pd.api.types.is_numeric_dtype(df[col]):
-                          df[col].fillna(df[col].mean(), inplace=True)
-                          st.success(f"Filled missing values in `{col}` with mean.")
-                      elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
-                          mode_val = df[col].mode()
-                          if not mode_val.empty:
-                              df[col].fillna(mode_val[0], inplace=True)
-                              st.success(f"Filled missing values in `{col}` with mode.")
-                          else:
-                              st.warning(f"Could not find mode for column `{col}`. Skipping imputation.")
-                      else:
-                           st.warning(f"Imputation strategy not defined for data type of column `{col}` (missing < 5%).")
-
-                 # Strategy 4: KNN Imputation for moderate missing percentage
-                 elif impute_moderate_missing and missing_pct >= 5 and missing_pct <= 50:
-                      st.info(f"Column `{col}` has {missing_pct:.1f}% missing. Using KNN Imputation with k={knn_neighbors}.")
-                      if pd.api.types.is_numeric_dtype(df[col]):
-                          try:
-                              imputer = KNNImputer(n_neighbors=knn_neighbors)
-                              df[[col]] = imputer.fit_transform(df[[col]])
-                              st.success(f"Imputed missing values in `{col}` using KNN.")
-                          except Exception as e:
-                              st.error(f"Error during KNN imputation for column `{col}`: {e}")
-                              st.warning(f"Skipping KNN imputation for `{col}`.")
-
-                      elif pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
-                          try:
-                              # Convert to string to handle potential NaN and other types
-                              cat_data = df[col].astype(str)
-
-                              # Handle unseen categories by adding a placeholder before fitting LabelEncoder
-                              unique_values = cat_data.dropna().unique().tolist()
-                              unique_values_for_encoding = unique_values + ['_placeholder_for_knn'] # Add a temporary placeholder
-
-                              le = LabelEncoder()
-                              le.fit(unique_values_for_encoding)
-
-                              encoded_data = le.transform(cat_data)
-
-                              imputer = KNNImputer(n_neighbors=knn_neighbors)
-                              imputed_encoded_data = imputer.fit_transform(encoded_data.reshape(-1, 1))
-
-                              imputed_encoded_data_int = np.round(imputed_encoded_data).flatten().astype(int)
-
-                              # Ensure imputed values are within the range of fitted categories
-                              max_encoded_val = len(le.classes_) - 1
-                              imputed_encoded_data_int = np.clip(imputed_encoded_data_int, 0, max_encoded_val)
-
-                              # Inverse transform
-                              df[col] = le.inverse_transform(imputed_encoded_data_int)
-
-                              # Replace the placeholder back to NaN if it was imputed to that value
-                              df[col] = df[col].replace('_placeholder_for_knn', np.nan)
-
-                              st.success(f"Imputed missing values in categorical column `{col}` using Label Encoding and KNN.")
-
-                          except Exception as e:
-                              st.error(f"Error during categorical imputation for column `{col}`: {e}")
-                              st.warning(f"Skipping categorical imputation for `{col}`.")
-                      else:
-                           st.warning(f"Imputation strategy not defined for data type of column `{col}` (missing >= 5% and <= 50%).")
-                 else:
-                     st.info(f"Column `{col}` ({missing_pct:.1f}% missing) was not imputed based on current settings.")
-elif imputation_strategy == "Mean/Mode for all":
-    for col in df.columns:
-        if df[col].isnull().sum() > 0:
-            if pd.api.types.is_numeric_dtype(df[col]):
-                df[col].fillna(df[col].mean(), inplace=True)
-            else:
-                mode_val = df[col].mode()
-                if not mode_val.empty:
-                    df[col].fillna(mode_val[0], inplace=True)
-elif imputation_strategy == "Median/Mode for all":
-    for col in df.columns:
-        if df[col].isnull().sum() > 0:
-            if pd.api.types.is_numeric_dtype(df[col]):
-                df[col].fillna(df[col].median(), inplace=True)
-            else:
-                mode_val = df[col].mode()
-                if not mode_val.empty:
-                    df[col].fillna(mode_val[0], inplace=True)
-elif imputation_strategy == "KNN for all":
-    imputer = KNNImputer(n_neighbors=knn_neighbors)
-    df = pd.DataFrame(imputer.fit_transform(df.select_dtypes(include=[np.number])), columns=df.select_dtypes(include=[np.number]).columns)
-elif imputation_strategy == "Drop rows with missing values":
-    df = df.dropna()
-# UI/UX: Add a “Next” Button to Navigate Tabs
-#To avoid scrolling to the top, add a navigation aid at the bottom:
-
-##python
-#Copy code
-col1, col2 = st.columns([8, 2])
-with col2:
-    if st.button("➡️ Next: Modeling", key="next_button"):
-        st.experimental_set_query_params(tab="modeling") 
-
-        st.write("Imputation process complete. Checking for remaining missing values:")
-        remaining_missing = df.isnull().sum()
-        if remaining_missing.sum() == 0:
-            st.success("No missing values remaining after imputation.")
-        else:
-            st.warning("Some missing values may remain depending on imputation strategies applied.")
-            st.write(remaining_missing[remaining_missing > 0])
-
-
-            # Store the imputed DataFrame in session state
-            st.session_state["df_imputed"] = df
-
-            # Provide a download link for the imputed data
-            csv_buffer = io.StringIO()
-            df.to_csv(csv_buffer, index=False)
-            csv_string = csv_buffer.getvalue()
-            st.download_button(
-                label="Download Imputed Data (CSV)",
-                data=csv_string,
-                file_name="imputed_data.csv",
-                mime="text/csv"
-            )
-
-    elif "df" in st.session_state and st.session_state["df"] is not None:
-         st.warning("Please preprocess the data first in the 'Data Preprocessing' tab before imputation.")
-    else:
-        st.warning("Please upload data first in the 'Upload Data' tab.")
