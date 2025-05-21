@@ -447,24 +447,25 @@ def basic_anomaly_detection():
             csv = df.loc[outliers].to_csv(index=False).encode()
         st.download_button(label=T("Download"), data=csv, file_name='basic_anomalies.csv', mime='text/csv')
 
-# --- Autoencoder anomaly detection ---
+
 def autoencoder_anomaly_detection():
     st.header(T("Advanced") + " - Autoencoder")
-    df = st.session_state.data
-    if df is None:
-        st.warning(T("Upload") + " your dataset first.")
+    if not st.session_state.preprocessing_complete:
+        st.warning("Please complete preprocessing first.")
         return
 
+    df = st.session_state.data
     numeric_df = df.select_dtypes(include=[np.number]).dropna()
     if numeric_df.empty:
         st.warning("No numeric columns available for autoencoder.")
         return
 
+    # --- Hyperparameters ---
     encoding_dim = st.slider(T("Encoding Dimension"), min_value=2, max_value=64, value=16)
     dropout_rate = st.slider(T("Dropout Rate"), 0.0, 0.5, 0.0)
     epochs = st.slider(T("Epochs"), 5, 100, 20)
 
-    # Build autoencoder
+    # --- Build Autoencoder ---
     input_dim = numeric_df.shape[1]
     input_layer = Input(shape=(input_dim,))
     encoded = Dense(encoding_dim, activation="relu")(input_layer)
@@ -475,33 +476,64 @@ def autoencoder_anomaly_detection():
     autoencoder = Model(inputs=input_layer, outputs=decoded)
     autoencoder.compile(optimizer='adam', loss='mse')
 
-    if st.button(T("Train Autoencoder")):
+    # --- Auto Train + Detect ---
+    if st.button(T("Detect Anomalies Based on Hyperparameters")):
         history = autoencoder.fit(numeric_df, numeric_df,
                                   epochs=epochs,
                                   batch_size=32,
                                   shuffle=True,
                                   verbose=0)
-        st.success("Training finished!")
-
         reconstructions = autoencoder.predict(numeric_df)
         mse = np.mean(np.square(numeric_df - reconstructions), axis=1)
 
-        threshold = st.slider(T("Threshold"), float(np.min(mse)), float(np.max(mse)), float(np.percentile(mse, 95)))
-        anomalies = mse > threshold
-
-        st.write(T("Anomalies found").format(np.sum(anomalies)))
-        st.dataframe(df.loc[anomalies])
-
+        # --- Show MSE Distribution ---
+        st.subheader("Step 1: Reconstruction Error (MSE) Histogram")
         fig, ax = plt.subplots()
         ax.hist(mse, bins=50)
-        ax.axvline(threshold, color='r', linestyle='--')
-        ax.set_title(T("Autoencoder Reconstruction Error Histogram"))
+        ax.set_title("Autoencoder Reconstruction Error Histogram")
         st.pyplot(fig)
 
+        # --- Check Normality ---
+        st.subheader("Step 2: Check MSE Normality")
+        from scipy.stats import shapiro
+        stat, p = shapiro(mse)
+        st.write(f"Shapiro-Wilk Test: W={stat:.4f}, p-value={p:.4f}")
+        if p > 0.05:
+            st.success("The MSE distribution appears normal (p > 0.05).")
+        else:
+            st.warning("The MSE distribution is not normal (p <= 0.05).")
+
+        # --- Choose Thresholding Method ---
+        st.subheader("Step 3: Choose Thresholding Method")
+        method = st.radio("Select thresholding method:", ["Z-score", "IQR"])
+
+        threshold = None
+        if method == "Z-score":
+            from scipy.stats import zscore
+            mse_z = zscore(mse)
+            threshold_z = st.slider("Z-score Threshold", min_value=1.0, max_value=5.0, value=3.0, step=0.1)
+            anomalies = mse_z > threshold_z
+            threshold = threshold_z
+        elif method == "IQR":
+            q1 = np.percentile(mse, 25)
+            q3 = np.percentile(mse, 75)
+            iqr = q3 - q1
+            iqr_factor = st.slider("IQR Multiplier", min_value=1.0, max_value=5.0, value=1.5, step=0.1)
+            upper_bound = q3 + iqr_factor * iqr
+            anomalies = mse > upper_bound
+            threshold = upper_bound
+
+        # --- Show Anomalies ---
+        st.subheader("Step 4: Detected Anomalies")
+        st.write(f"Total anomalies detected: {np.sum(anomalies)}")
+        st.dataframe(df.loc[anomalies])
+
+        # --- Download ---
         if st.button(T("Download") + " CSV - Autoencoder Anomalies"):
             csv = df.loc[anomalies].to_csv(index=False).encode()
-            st.download_button(label=T("Download"), data=csv, file_name='autoencoder_anomalies.csv', mime='text/csv')
-
+            st.download_button(label=T("Download"), data=csv,
+                               file_name='autoencoder_anomalies.csv',
+                               mime='text/csv')
 
 
 
