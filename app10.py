@@ -243,7 +243,7 @@ def set_background_and_logo(logo_path=None, background_image_path=None):
         st.image(logo_path, width=150)
 # --------------------------
 
-ef main():
+def main():
     st.set_page_config(page_title="Clinical Data Explorer", layout="wide")
     local_css()
 
