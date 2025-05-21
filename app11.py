@@ -152,53 +152,76 @@ def preprocessing():
         st.warning(T("Upload") + " your dataset first.")
         return
 
-        st.subheader(T("Data Cleaning"))
+            st.subheader(T("Data Cleaning"))
 
     changes = []
 
-    # Normalize column names
+    # --- AUTOMATED CLEANING SECTION ---
     df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
     changes.append("Stripped and standardized column names")
 
-    # Rename gender column to 'sex' if applicable
     gender_columns = [col for col in df.columns if 'gender' in col]
     for col in gender_columns:
         df.rename(columns={col: 'sex'}, inplace=True)
         changes.append(f"Renamed column '{col}' to 'sex'")
 
-    # Rename age-related column to 'age' if 'age' not already present
     if 'age' not in df.columns:
         age_columns = [col for col in df.columns if 'age' in col]
         if age_columns:
             df.rename(columns={age_columns[0]: 'age'}, inplace=True)
             changes.append(f"Renamed column '{age_columns[0]}' to 'age'")
 
-    # Standardize values in 'sex'
     sex_mapping = {
-        'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male', 'MALE': 'male', 'Male': 'male',
-        'female': 'female', 'f': 'female', 'woman': 'female', 'girl': 'female', 'FEMALE': 'female', 'Female': 'female'
+        'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male',
+        'female': 'female', 'f': 'female', 'woman': 'female', 'girl': 'female',
+        'MALE': 'male', 'Male': 'male', 'FEMALE': 'female', 'Female': 'female'
     }
     if 'sex' in df.columns:
         df['sex'] = df['sex'].astype(str).str.strip().str.lower().map(sex_mapping)
         changes.append("Mapped values in 'sex' column to standardized format")
 
-    # Split BP column into systolic and diastolic
     if 'bp' in df.columns:
         bp_split = df['bp'].str.extract(r'(?P<systolic_bp>\d{2,3})[^\d]*(?P<diastolic_bp>\d{2,3})')
         df['systolic_bp'] = pd.to_numeric(bp_split['systolic_bp'], errors='coerce')
         df['diastolic_bp'] = pd.to_numeric(bp_split['diastolic_bp'], errors='coerce')
         changes.append("Split 'bp' into 'systolic_bp' and 'diastolic_bp'")
 
-    # Show changes made
     if changes:
-        st.markdown("### Cleaning Actions Performed:")
+        st.markdown("### ✅ Cleaning Actions Performed:")
         for change in changes:
             st.write(f"- {change}")
     else:
-        st.info("No cleaning actions were necessary.")
+        st.info("No automatic cleaning changes were made.")
 
-    # ---- VARIABLE TYPE CONVERSION + ENCODING ----
-    st.subheader("🔁 Variable Type Conversion and Encoding")
+    # --- VARIABLE TYPE CONVERSION ---
+    st.subheader("🔄 Variable Type Conversion")
+
+    selected_type_col = st.selectbox("Select a column to change its type", df.columns)
+    current_dtype = df[selected_type_col].dtype
+
+    target_dtype = st.selectbox(
+        f"Convert column '{selected_type_col}' from {current_dtype} to:",
+        ["int", "float", "str", "bool", "category"]
+    )
+
+    if st.button("Apply Type Conversion"):
+        try:
+            df[selected_type_col] = df[selected_type_col].astype(target_dtype)
+            st.success(f"✅ Converted column '{selected_type_col}' to type '{target_dtype}'")
+        except Exception as e:
+            st.error(f"❌ Conversion failed: {e}")
+
+    # --- DROP COLUMNS ---
+    st.subheader("🗑️ Drop Variables")
+
+    columns_to_drop = st.multiselect("Select columns to drop from the dataset", df.columns)
+
+    if columns_to_drop and st.button("Drop Selected Columns"):
+        df.drop(columns=columns_to_drop, inplace=True)
+        st.success(f"✅ Dropped columns: {', '.join(columns_to_drop)}")
+
+    # --- ENCODING CATEGORICAL VARIABLES ---
+    st.subheader("🔁 Encode Categorical Variables")
 
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
 
@@ -213,17 +236,18 @@ def preprocessing():
             if encoding_type.startswith("Label"):
                 le = LabelEncoder()
                 df[selected_col] = le.fit_transform(df[selected_col].astype(str))
-                st.success(f" Label encoding applied to '{selected_col}'")
+                st.success(f"✅ Label encoding applied to '{selected_col}'")
             elif encoding_type.startswith("One-Hot"):
                 df = pd.get_dummies(df, columns=[selected_col], drop_first=True)
-                st.success(f" One-hot encoding applied to '{selected_col}'")
+                st.success(f"✅ One-hot encoding applied to '{selected_col}'")
 
-            st.warning(" Tip: Use Label Encoding for ordinal variables and One-Hot Encoding for nominal variables.")
-
+            st.warning("💡 Use Label Encoding for **ordinal** variables and One-Hot Encoding for **nominal** ones.")
     else:
-        st.info("No categorical columns found to encode.")
+        st.info("No categorical columns found for encoding.")
 
+    # Update session state with cleaned df
     st.session_state.data = df
+
 
     # Show missing data
     st.subheader(T("Missing Data Analysis"))
