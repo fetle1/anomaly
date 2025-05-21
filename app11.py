@@ -142,6 +142,7 @@ def data_overview():
         else:
             fig = px.histogram(df, x=selected_column)
             st.plotly_chart(fig)
+# Clean column names
 
 # --- Preprocessing tab ---
 def preprocessing():
@@ -150,6 +151,21 @@ def preprocessing():
     if df is None:
         st.warning(T("Upload") + " your dataset first.")
         return
+    st.subheader(T(Data Cleaning))
+    df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+
+# Map sex to standardized values
+    sex_mapping = {
+        'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male', 'MALE': 'male', 'Male': 'male',
+        'female': 'female', 'f': 'female', 'woman': 'female', 'girl': 'female', 'FEMALE': 'female', 'Female': 'female'
+    }
+    df['sex'] = df['sex'].str.strip().str.lower().map(sex_mapping)
+    
+    # Split blood pressure column if it exists
+    if 'bp' in df.columns:
+        bp_split = df['bp'].str.extract(r'(?P<systolic_bp>\d{2,3})[^\d]*(?P<diastolic_bp>\d{2,3})')
+        df['systolic_bp'] = pd.to_numeric(bp_split['systolic_bp'], errors='coerce')
+        df['diastolic_bp'] = pd.to_numeric(bp_split['diastolic_bp'], errors='coerce')
 
     st.subheader(T("Missing Data Analysis"))
     st.write(df.isnull().sum())
@@ -308,7 +324,8 @@ def rule_based_anomaly_detection():
         st.warning(T("Upload") + " your dataset first.")
         return
 
-    # Example clinical rules:
+    st.write("Available columns:", df.columns.tolist())
+
     # BPsys normal range 90-120, BPDias normal 60-80
     conditions = [
         (df["BPsys"] < 90) | (df["BPsys"] > 120),
