@@ -247,7 +247,7 @@ def preprocessing():
 
     # Update session state with cleaned df
     st.session_state.data = df
-
+    
 
     # Show missing data
     st.subheader(T("Missing Data Analysis"))
@@ -404,6 +404,7 @@ def autoencoder_anomaly_detection():
 # --- Rule-based anomaly detection ---
 def rule_based_anomaly_detection(df):
     # Ensure numeric types
+    st.session_state.data = df
     df["systolic_bp"] = pd.to_numeric(df["systolic_bp"], errors="coerce")
     df["diastolic_bp"] = pd.to_numeric(df["diastolic_bp"], errors="coerce")
 
