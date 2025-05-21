@@ -450,11 +450,10 @@ def basic_anomaly_detection():
 
 def autoencoder_anomaly_detection():
     st.header(T("Advanced") + " - Autoencoder")
+    df = st.session_state.data
     if not st.session_state.preprocessing_complete:
         st.warning("Please complete preprocessing first.")
         return
-
-    df = st.session_state.data
     numeric_df = df.select_dtypes(include=[np.number]).dropna()
     if numeric_df.empty:
         st.warning("No numeric columns available for autoencoder.")
