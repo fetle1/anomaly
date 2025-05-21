@@ -424,7 +424,7 @@ def rule_based_anomaly_detection(df):
     st.write(f"🔎 Found {df['bp_anomaly'].sum()} BP anomalies")
     st.dataframe(df[df["bp_anomaly"]])
 
-    return df
+
 
    
 # --- Main tabs ---
