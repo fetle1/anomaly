@@ -455,4 +455,5 @@ with tabs[4]:
     autoencoder_anomaly_detection()
 
 with tabs[5]:
-    rule_based_anomaly_detection()
+    rule_based_anomaly_detection(st.session_state.data)
+
