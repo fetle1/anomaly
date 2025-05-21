@@ -256,20 +256,25 @@ def preprocessing():
         st.session_state.data = df
         
     
-        # Show missing data
+                # Show missing data
         st.subheader(T("Missing Data Analysis"))
         st.write(df.isnull().sum())
-    
+        
+        # Missing data pattern
         st.markdown("### Missing Data Pattern")
         msno.matrix(df)
         st.pyplot(plt.gcf())
         plt.clf()
-    
-        # Statistical test for MCAR vs MAR/NMAR
-        st.subheader(T("Statistical Tests for Missingness Type"))
-        missing_tests = {}
-        for col in df.columns:
-            if df[col].isnull().sum() > 0 and pd.api.types.is_numeric_dtype(df[col]):
+        
+        # Choose variables for statistical test
+        st.subheader(T("Missingness Mechanism Test"))
+        numeric_cols_with_na = [col for col in df.columns if df[col].isnull().sum() > 0 and pd.api.types.is_numeric_dtype(df[col])]
+        
+        selected_cols = st.multiselect("Select columns to test for missingness mechanism", numeric_cols_with_na)
+        
+        if selected_cols:
+            missing_tests = {}
+            for col in selected_cols:
                 group = df[col].isnull()
                 for other_col in df.columns:
                     if other_col != col and pd.api.types.is_numeric_dtype(df[other_col]):
@@ -279,32 +284,41 @@ def preprocessing():
                             break
                 else:
                     missing_tests[col] = "Potential MCAR"
-        st.write(missing_tests)
-        st.session_state.data = df
-    
-        # Column-wise imputation UI
+            st.write(missing_tests)
+        
+        # Global imputation method
+        st.subheader(T("Global Missing Data Handling Strategy"))
+        global_method = st.selectbox("Choose a default imputation method for all variables", 
+                                     ["None", "Mean", "Median", "Mode", "KNN", "Drop Row"])
+        
+        # Column-wise imputation
         st.subheader(T("Imputation per Column"))
-        for col in df.columns:
-            if df[col].isnull().sum() > 0:
-                method = st.selectbox(f"{T('Imputation method for')} {col}",
-                                      ["Mean", "Median", "Mode", "KNN", "Drop Row"],
+        for col in numeric_cols_with_na:
+            col_method = st.selectbox(f"{T('Imputation method for')} {col}",
+                                      ["Default (Global)", "Mean", "Median", "Mode", "KNN", "Drop Row"],
                                       key=col)
-                if st.button(f"Apply {method} to {col}", key="btn_" + col):
-                    if method == "Mean" and pd.api.types.is_numeric_dtype(df[col]):
-                        df[col].fillna(df[col].mean(), inplace=True)
-                    elif method == "Median" and pd.api.types.is_numeric_dtype(df[col]):
-                        df[col].fillna(df[col].median(), inplace=True)
-                    elif method == "Mode":
-                        df[col].fillna(df[col].mode()[0], inplace=True)
-                    elif method == "KNN":
-                        knn = KNNImputer()
-                        df[df.columns] = knn.fit_transform(df)
-                    elif method == "Drop Row":
-                        df.dropna(subset=[col], inplace=True)
-                    st.success(f"{method} imputation applied to {col}")
-    
+            
+            if st.button(f"Apply {col_method} to {col}", key="btn_" + col):
+                method_to_apply = global_method if col_method == "Default (Global)" else col_method
+        
+                if method_to_apply == "Mean" and pd.api.types.is_numeric_dtype(df[col]):
+                    df[col].fillna(df[col].mean(), inplace=True)
+                elif method_to_apply == "Median" and pd.api.types.is_numeric_dtype(df[col]):
+                    df[col].fillna(df[col].median(), inplace=True)
+                elif method_to_apply == "Mode":
+                    df[col].fillna(df[col].mode()[0], inplace=True)
+                elif method_to_apply == "KNN":
+                    knn = KNNImputer()
+                    df[df.columns] = knn.fit_transform(df)
+                elif method_to_apply == "Drop Row":
+                    df.dropna(subset=[col], inplace=True)
+                elif method_to_apply == "None":
+                    pass  # Do nothing
+                st.success(f"{method_to_apply} imputation applied to {col}")
+        
+        # Update session state
         st.session_state.data = df
-    st.session_state.preprocessing_complete = True
+        st.session_state.preprocessing_complete = True
 
 # --- Basic anomaly detection ---
 def basic_anomaly_detection():
