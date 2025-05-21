@@ -247,25 +247,7 @@ def preprocessing():
     plt.clf()
 
     # --- MISSINGNESS MECHANISM TEST ---
-    st.subheader(T("Missingness Mechanism Test"))
-    numeric_cols_with_na = [col for col in df.columns if df[col].isnull().sum() > 0 and pd.api.types.is_numeric_dtype(df[col])]
-
-    selected_cols = st.multiselect("Select columns to test for missingness mechanism", numeric_cols_with_na)
-
-    if selected_cols:
-        missing_tests = {}
-        for col in selected_cols:
-            group = df[col].isnull()
-            for other_col in df.columns:
-                if other_col != col and pd.api.types.is_numeric_dtype(df[other_col]):
-                    t_stat, p_value = stats.ttest_ind(df[other_col][group], df[other_col][~group], nan_policy='omit')
-                    if p_value < 0.05:
-                        missing_tests[col] = "Potential MAR/NMAR"
-                        break
-            else:
-                missing_tests[col] = "Potential MCAR"
-        st.write(missing_tests)
-
+    
     # --- GLOBAL MISSING DATA STRATEGY ---
     st.subheader(T("Global Missing Data Handling Strategy"))
     global_method = st.selectbox("Choose a default imputation method for all variables",
@@ -299,20 +281,122 @@ def preprocessing():
 
     st.session_state.data = df
     st.session_state.preprocessing_complete = True
+def detect_rule_based_anomalies(df):
+    df = df.copy()
+    anomalies = pd.Series([False] * len(df), index=df.index)
+    reasons = {i: [] for i in df.index}  # Dictionary to track reasons for each row
+
+    def col_exists(*cols):
+        return all(col in df.columns for col in cols)
+
+    # Clean up types
+    df["systolic_bp"] = pd.to_numeric(df.get("systolic_bp", pd.NA), errors="coerce")
+    df["diastolic_bp"] = pd.to_numeric(df.get("diastolic_bp", pd.NA), errors="coerce")
+
+    if col_exists('hemoglobin'):
+        condition = df['hemoglobin'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Hemoglobin ≤ 0")
+
+    if col_exists('glucose'):
+        condition = df['glucose'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Glucose ≤ 0")
+
+    if col_exists('spo2'):
+        condition = df['spo2'] <= 0
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("SpO2 ≤ 0")
+
+    if col_exists('systolic_bp', 'diastolic_bp'):
+        condition = df['diastolic_bp'] > df['systolic_bp']
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Diastolic BP > Systolic BP")
+
+    if col_exists('sex', 'pregnant'):
+        condition = (df['sex'].astype(str).str.lower() == 'male') & (df['pregnant'] == True)
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Male marked as pregnant")
+
+    if col_exists('sex', 'bph'):
+        condition = (df['sex'].astype(str).str.lower() == 'female') & (df['bph'] == True)
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Female marked as having BPH")
+
+    if col_exists('age', 'pregnant'):
+        condition_young = (df['age'] < 5) & (df['pregnant'] == True)
+        condition_old = (df['age'] > 70) & (df['pregnant'] == True)
+        anomalies |= condition_young | condition_old
+        for i in df[condition_young].index:
+            reasons[i].append("Pregnant but age < 5")
+        for i in df[condition_old].index:
+            reasons[i].append("Pregnant but age > 70")
+
+    if col_exists('dob', 'dod'):
+        dob = pd.to_datetime(df['dob'], errors='coerce')
+        dod = pd.to_datetime(df['dod'], errors='coerce')
+        condition = dob > dod
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("DOB after DOD")
+
+    if col_exists('admission_date', 'discharge_date'):
+        adm = pd.to_datetime(df['admission_date'], errors='coerce')
+        dis = pd.to_datetime(df['discharge_date'], errors='coerce')
+        condition = dis < adm
+        anomalies |= condition
+        for i in df[condition].index:
+            reasons[i].append("Discharge before admission")
+
+    if col_exists('pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy', 'sex'):
+        condition_f = (df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'] == 3) & \
+                      (df['sex'].astype(str).str.upper() == 'F')
+        condition_m = df['pregenant_or_died_with_in_six_weeks_of_end_of_pregenancy'].isin([1, 2]) & \
+                      (df['sex'].astype(str).str.upper() == 'M')
+        anomalies |= condition_f | condition_m
+        for i in df[condition_f].index:
+            reasons[i].append("Female marked as death due to pregnancy-related cause (code 3)")
+        for i in df[condition_m].index:
+            reasons[i].append("Male marked as pregnant/death related to pregnancy (code 1/2)")
+
+    if col_exists('age', 'dob', 'dod'):
+        try:
+            yob = pd.to_datetime(df['dob'], errors='coerce').dt.year
+            yod = pd.to_datetime(df['dod'], errors='coerce').dt.year
+            age_calc = yod - yob
+            age = pd.to_numeric(df['age'], errors='coerce')
+            condition = age != age_calc
+            anomalies |= condition
+            for i in df[condition].index:
+                reasons[i].append("Reported age does not match DOB-DOD")
+        except Exception as e:
+            print(f"Error in age calculation: {e}")
+
+    reasons_final = {i: "; ".join(reasons[i]) for i in df[anomalies].index}
+    return anomalies, reasons_final
 
 
 # --- Basic anomaly detection ---
 def basic_anomaly_detection():
     st.header(T("Standard/Basic"))
+
     if not st.session_state.preprocessing_complete:
         st.warning("Please complete preprocessing first.")
         return
 
     df = st.session_state.data
+    numeric_df = df.select_dtypes(include=np.number)
 
-    method = st.selectbox(T("Select detection method"),
-                          ["Z-score", "IQR", "Median Absolute Deviation", "Mahalanobis Distance"])
+    method = st.selectbox(T("Select detection method"), 
+                          ["Z-score", "IQR", "Median Absolute Deviation", "Mahalanobis Distance", "Rule-based"])
     outliers = pd.Series(False, index=df.index)
+    reasons = {}
 
     if method == "Z-score":
         threshold = st.slider("Z-score Threshold", 2.0, 5.0, 3.0)
@@ -337,14 +421,27 @@ def basic_anomaly_detection():
     elif method == "Mahalanobis Distance":
         robust_cov = MinCovDet().fit(numeric_df)
         mahal_dist = robust_cov.mahalanobis(numeric_df)
-        threshold = st.slider("Mahalanobis Distance Threshold", float(np.percentile(mahal_dist, 90)), float(np.max(mahal_dist)), float(np.percentile(mahal_dist, 95)))
+        threshold = st.slider("Mahalanobis Distance Threshold", float(np.percentile(mahal_dist, 90)),
+                              float(np.max(mahal_dist)), float(np.percentile(mahal_dist, 95)))
         outliers = mahal_dist > threshold
 
-    st.write(T("Anomalies found").format(outliers.sum()))
-    st.dataframe(df.loc[outliers])
+    elif method == "Rule-based":
+        outliers, reasons = detect_rule_based_anomalies(df)
+
+    st.write(f"{T('Anomalies found')}: {outliers.sum()}")
+
+    if method == "Rule-based" and reasons:
+        df_outliers = df[outliers].copy()
+        df_outliers["reason"] = df_outliers.index.map(reasons)
+        st.dataframe(df_outliers)
+    else:
+        st.dataframe(df.loc[outliers])
 
     if st.button(T("Download") + " CSV - Basic Anomalies"):
-        csv = df.loc[outliers].to_csv(index=False).encode()
+        if method == "Rule-based" and reasons:
+            csv = df_outliers.to_csv(index=False).encode()
+        else:
+            csv = df.loc[outliers].to_csv(index=False).encode()
         st.download_button(label=T("Download"), data=csv, file_name='basic_anomalies.csv', mime='text/csv')
 
 # --- Autoencoder anomaly detection ---
@@ -402,27 +499,8 @@ def autoencoder_anomaly_detection():
             csv = df.loc[anomalies].to_csv(index=False).encode()
             st.download_button(label=T("Download"), data=csv, file_name='autoencoder_anomalies.csv', mime='text/csv')
 
-# --- Rule-based anomaly detection ---
-def rule_based_anomaly_detection(df):
-    # Ensure numeric types
-    if not st.session_state.preprocessing_complete:
-        st.warning("Please complete preprocessing first.")
-        return
 
-    df = st.session_state.data
-    df["systolic_bp"] = pd.to_numeric(df["systolic_bp"], errors="coerce")
-    df["diastolic_bp"] = pd.to_numeric(df["diastolic_bp"], errors="coerce")
 
-    # Drop missing values for comparison
-    df = df.dropna(subset=["systolic_bp", "diastolic_bp"])
-
-    # Flag anomaly
-    df["bp_anomaly"] = df["systolic_bp"] < df["diastolic_bp"]
-
-    # Optionally log or print how many anomalies
-    print(f"Flagged {df['bp_anomaly'].sum()} systolic<diastolic anomalies")
-    st.write(f"🔎 Found {df['bp_anomaly'].sum()} BP anomalies")
-    st.dataframe(df[df["bp_anomaly"]])
 
 
 
@@ -454,6 +532,4 @@ with tabs[3]:
 with tabs[4]:
     autoencoder_anomaly_detection()
 
-with tabs[5]:
-    rule_based_anomaly_detection()
 
