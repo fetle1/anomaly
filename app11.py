@@ -152,7 +152,7 @@ def preprocessing():
         st.warning(T("Upload") + " your dataset first.")
         return
 
-            st.subheader(T("Data Cleaning"))
+    st.subheader(T("Data Cleaning"))
 
     changes = []
 
