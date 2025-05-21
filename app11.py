@@ -195,62 +195,61 @@ def preprocessing():
     st.session_state.data = df
     
         # --- VARIABLE TYPE CONVERSION ---
-        st.subheader("🔄 Variable Type Conversion")
+    st.subheader("🔄 Variable Type Conversion")
     
-        selected_type_col = st.selectbox("Select a column to change its type", df.columns)
-        current_dtype = df[selected_type_col].dtype
+    selected_type_col = st.selectbox("Select a column to change its type", df.columns)
+    current_dtype = df[selected_type_col].dtype
     
-        target_dtype = st.selectbox(
-            f"Convert column '{selected_type_col}' from {current_dtype} to:",
-            ["int", "float", "str", "bool", "category"]
-        )
-        st.session_state.data = df
+    target_dtype = st.selectbox(
+        f"Convert column '{selected_type_col}' from {current_dtype} to:",
+           ["int", "float", "str", "bool", "category"]
+       )
+     st.session_state.data = df
     
-        if st.button("Apply Type Conversion"):
-            try:
-                df[selected_type_col] = df[selected_type_col].astype(target_dtype)
-                st.success(f"✅ Converted column '{selected_type_col}' to type '{target_dtype}'")
-            except Exception as e:
-                st.error(f"❌ Conversion failed: {e}")
-        st.session_state.data = df
+     if st.button("Apply Type Conversion"):
+         try:
+             df[selected_type_col] = df[selected_type_col].astype(target_dtype)
+             st.success(f"✅ Converted column '{selected_type_col}' to type '{target_dtype}'")
+         except Exception as e:
+             st.error(f"❌ Conversion failed: {e}")
+     st.session_state.data = df
     
         # --- DROP COLUMNS ---
-        st.subheader("🗑️ Drop Variables")
+     st.subheader("🗑️ Drop Variables")
     
-        columns_to_drop = st.multiselect("Select columns to drop from the dataset", df.columns)
+     columns_to_drop = st.multiselect("Select columns to drop from the dataset", df.columns)
     
-        if columns_to_drop and st.button("Drop Selected Columns"):
-            df.drop(columns=columns_to_drop, inplace=True)
-            st.success(f"✅ Dropped columns: {', '.join(columns_to_drop)}")
-        st.session_state.data = df
+     if columns_to_drop and st.button("Drop Selected Columns"):
+         df.drop(columns=columns_to_drop, inplace=True)
+         st.success(f"✅ Dropped columns: {', '.join(columns_to_drop)}")
+         st.session_state.data = df
     
         # --- ENCODING CATEGORICAL VARIABLES ---
-        st.subheader("🔁 Encode Categorical Variables")
+     st.subheader("🔁 Encode Categorical Variables")
     
-        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+     categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
     
-        if categorical_cols:
-            selected_col = st.selectbox("Choose a categorical column to encode", categorical_cols)
-            encoding_type = st.radio(
-                "Select encoding type",
-                ["Label Encoding (Ordinal)", "One-Hot Encoding (Nominal)"]
-            )
+     if categorical_cols:
+        selected_col = st.selectbox("Choose a categorical column to encode", categorical_cols)
+        encoding_type = st.radio(
+            "Select encoding type",
+              ["Label Encoding (Ordinal)", "One-Hot Encoding (Nominal)"]
+           )
     
-            if encoding_type and st.button("Apply Encoding"):
-                if encoding_type.startswith("Label"):
-                    le = LabelEncoder()
-                    df[selected_col] = le.fit_transform(df[selected_col].astype(str))
-                    st.success(f"✅ Label encoding applied to '{selected_col}'")
-                elif encoding_type.startswith("One-Hot"):
-                    df = pd.get_dummies(df, columns=[selected_col], drop_first=True)
-                    st.success(f"✅ One-hot encoding applied to '{selected_col}'")
-    
-                st.warning("💡 Use Label Encoding for **ordinal** variables and One-Hot Encoding for **nominal** ones.")
-        else:
+         if encoding_type and st.button("Apply Encoding"):
+         if encoding_type.startswith("Label"):
+             le = LabelEncoder()
+          df[selected_col] = le.fit_transform(df[selected_col].astype(str))
+           st.success(f"✅ Label encoding applied to '{selected_col}'")
+          elif encoding_type.startswith("One-Hot"):
+              df = pd.get_dummies(df, columns=[selected_col], drop_first=True)
+           st.success(f"✅ One-hot encoding applied to '{selected_col}'")
+      st.warning("💡 Use Label Encoding for **ordinal** variables and One-Hot Encoding for **nominal** ones.")
+    else:
             st.info("No categorical columns found for encoding.")
     
         # Update session state with cleaned df
-        st.session_state.data = df
+    st.session_state.data = df
         
     
                 # Show missing data
