@@ -442,93 +442,88 @@ elif st.session_state.active_tab == T("Anomaly Detection"):
         csv = anomaly_df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Rule-Based Anomalies", data=csv, file_name="rule_based_anomalies.csv", mime="text/csv")
 
-   elif detection_method == "Autoencoder":
-        batch_size = 32
-        dropout_rate = 0.0
-        encoding_dim = 16
-        epochs = 20
+    elif detection_method == "Autoencoder":
+           batch_size = 32
+           dropout_rate = 0.0
+           encoding_dim = 16
+           epochs = 20
+        
+            # Scale data and train autoencoder
+           from sklearn.preprocessing import StandardScaler
+           from tensorflow.keras.models import Model
+           from tensorflow.keras.layers import Input, Dense, Dropout
+           import tensorflow as tf
+           import plotly.express as px
+           # Filter numeric columns only
+           numeric_cols = df.select_dtypes(include='number').columns
+           df_numeric = df[numeric_cols].dropna()
+        
+           scaler = StandardScaler()
+           X_scaled = scaler.fit_transform(df_numeric)
+        
+           input_dim = X_scaled.shape[1]
+           input_layer = Input(shape=(input_dim,))
+           encoded = Dense(encoding_dim, activation='relu')(input_layer)
+           if dropout_rate > 0:
+               encoded = Dropout(dropout_rate)(encoded)
+           decoded = Dense(input_dim, activation='linear')(encoded)
+                    autoencoder = Model(inputs=input_layer, outputs=decoded)
+           autoencoder.compile(optimizer='adam', loss='mse')
+           autoencoder.fit(X_scaled, X_scaled, epochs=epochs, batch_size=batch_size, shuffle=True, verbose=0)
+        
+           # Get reconstruction error
+           X_pred = autoencoder.predict(X_scaled)
+           mse = np.mean(np.square(X_scaled - X_pred), axis=1)
+                    st.markdown("### MSE Distribution (Reconstruction Error)")
+           mse_df = pd.DataFrame({'Reconstruction Error': mse})
+           fig_mse = px.histogram(mse_df, x='Reconstruction Error', nbins=50, title="Reconstruction Error Distribution")
+           st.plotly_chart(fig_mse)
     
-        # Scale data and train autoencoder
-        from sklearn.preprocessing import StandardScaler
-        from tensorflow.keras.models import Model
-        from tensorflow.keras.layers import Input, Dense, Dropout
-        import tensorflow as tf
-        import plotly.express as px
-    
-        # Filter numeric columns only
-        numeric_cols = df.select_dtypes(include='number').columns
-        df_numeric = df[numeric_cols].dropna()
-    
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(df_numeric)
-    
-        input_dim = X_scaled.shape[1]
-        input_layer = Input(shape=(input_dim,))
-        encoded = Dense(encoding_dim, activation='relu')(input_layer)
-        if dropout_rate > 0:
-            encoded = Dropout(dropout_rate)(encoded)
-        decoded = Dense(input_dim, activation='linear')(encoded)
-    
-        autoencoder = Model(inputs=input_layer, outputs=decoded)
-        autoencoder.compile(optimizer='adam', loss='mse')
-        autoencoder.fit(X_scaled, X_scaled, epochs=epochs, batch_size=batch_size, shuffle=True, verbose=0)
-    
-        # Get reconstruction error
-        X_pred = autoencoder.predict(X_scaled)
-        mse = np.mean(np.square(X_scaled - X_pred), axis=1)
-    
-        st.markdown("### MSE Distribution (Reconstruction Error)")
-        mse_df = pd.DataFrame({'Reconstruction Error': mse})
-        fig_mse = px.histogram(mse_df, x='Reconstruction Error', nbins=50, title="Reconstruction Error Distribution")
-        st.plotly_chart(fig_mse)
-
-       # fig_mse = px.histogram(mse, nbins=50, title="Reconstruction Error Distribution")
-        #st.plotly_chart(fig_mse)
-    
-        # Thresholding Method Selection
-        st.markdown("### Thresholding")
-        thershold_method = st.radio("Select method to determine threshold", ["Manual (slider)", "Z-score", "IQR"])
-    
-        if thershold_method == "Manual (slider)":
-            threshold = st.slider("Set anomaly threshold (between 0 and 1)", 0.0, 1.0, 0.05)
-        elif thershold_method == "Z-score":
-            z_scores = (mse - np.mean(mse)) / np.std(mse)
-            z_thresh = st.slider("Set Z-score threshold", 0.0, 5.0, 3.0)
-            threshold = np.percentile(mse, 100 * (1 - np.mean(z_scores > z_thresh)))
-        elif thershold_method == "IQR":
-            q1, q3 = np.percentile(mse, [25, 75])
-            iqr = q3 - q1
-            iqr_thresh = st.slider("Set IQR multiplier", 1.0, 3.0, 1.5)
-            threshold = q3 + iqr_thresh * iqr
-    
-        anomalies = mse > threshold
-        anomaly_df = df_numeric[anomalies]
-        st.markdown(f"**Anomalies Detected:** {anomalies.sum()} rows")
-        st.dataframe(anomaly_df)
-    
-        # Allow download of anomalies
-        csv = anomaly_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Anomalies", data=csv, file_name="anomalies.csv", mime="text/csv")
-    
-        # General Visualization
-        st.markdown("### Data Distribution Explorer")
-        selected_var = st.selectbox("Select a variable to visualize", df.columns)
-        import plotly.express as px
-        if pd.api.types.is_numeric_dtype(df[selected_var]):
-            plot_type = st.radio("Plot type", ["Histogram", "Line"])
-            if plot_type == "Histogram":
-                fig = px.histogram(df, x=selected_var, title=f"{selected_var} Histogram")
-            else:
-                fig = px.line(df, y=selected_var, title=f"{selected_var} Line Plot")
-        else:
-            plot_type = st.radio("Plot type", ["Bar", "Pie"])
-            value_counts = df[selected_var].value_counts().reset_index()
-            value_counts.columns = [selected_var, 'Count']
-            if plot_type == "Bar":
-                fig = px.bar(value_counts, x=selected_var, y='Count', title=f"{selected_var} Distribution")
-            else:
-                fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
-        st.plotly_chart(fig)
+           # fig_mse = px.histogram(mse, nbins=50, title="Reconstruction Error Distribution")
+            #st.plotly_chart(fig_mse)
+        
+            # Thresholding Method Selection
+           st.markdown("### Thresholding")
+           thershold_method = st.radio("Select method to determine threshold", ["Manual (slider)", "Z-score", "IQR"])
+        
+           if thershold_method == "Manual (slider)":
+               threshold = st.slider("Set anomaly threshold (between 0 and 1)", 0.0, 1.0, 0.05)
+           elif thershold_method == "Z-score":
+               z_scores = (mse - np.mean(mse)) / np.std(mse)
+               z_thresh = st.slider("Set Z-score threshold", 0.0, 5.0, 3.0)
+               threshold = np.percentile(mse, 100 * (1 - np.mean(z_scores > z_thresh)))
+           elif thershold_method == "IQR":
+               q1, q3 = np.percentile(mse, [25, 75])
+               iqr = q3 - q1
+               iqr_thresh = st.slider("Set IQR multiplier", 1.0, 3.0, 1.5)
+               threshold = q3 + iqr_thresh * iqr
+        
+           anomalies = mse > threshold
+           anomaly_df = df_numeric[anomalies]
+           st.markdown(f"**Anomalies Detected:** {anomalies.sum()} rows")
+           st.dataframe(anomaly_df)
+                    # Allow download of anomalies
+           csv = anomaly_df.to_csv(index=False).encode('utf-8')
+           st.download_button("📥 Download Anomalies", data=csv, file_name="anomalies.csv", mime="text/csv")
+                    # General Visualization
+           st.markdown("### Data Distribution Explorer")
+           selected_var = st.selectbox("Select a variable to visualize", df.columns)
+           import plotly.express as px
+           if pd.api.types.is_numeric_dtype(df[selected_var]):
+               plot_type = st.radio("Plot type", ["Histogram", "Line"])
+               if plot_type == "Histogram":
+                   fig = px.histogram(df, x=selected_var, title=f"{selected_var} Histogram")
+               else:
+                   fig = px.line(df, y=selected_var, title=f"{selected_var} Line Plot")
+           else:
+               plot_type = st.radio("Plot type", ["Bar", "Pie"])
+               value_counts = df[selected_var].value_counts().reset_index()
+               value_counts.columns = [selected_var, 'Count']
+               if plot_type == "Bar":
+                   fig = px.bar(value_counts, x=selected_var, y='Count', title=f"{selected_var} Distribution")
+               else:
+                   fig = px.pie(value_counts, names=selected_var, values='Count', title=f"{selected_var} Pie Chart")
+           st.plotly_chart(fig)
     elif detection_method == "Statistical":
         numeric_cols = df.select_dtypes(include='number').columns.tolist()
         selected_var = st.selectbox("Select numeric variable to analyze", numeric_cols)
