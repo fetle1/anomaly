@@ -511,8 +511,7 @@ tab_list = [
     T("Data Overview"),
     T("Preprocessing"),
     T("Standard/Basic"),
-    T("Advanced"),
-    )
+    T("Advanced")
 ]
 
 tabs = st.tabs(tab_list)
