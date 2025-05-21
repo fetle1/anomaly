@@ -346,7 +346,8 @@ def rule_based_anomaly_detection():
 
     # BPsys normal range 90-120, BPDias normal 60-80
     conditions = [
-        (df["systolic_bp"])< (df["dystolic_bp"] )]
+        (df["systolic_bp"] < df["diastolic_bp"])
+
     
     anomalies = df[np.logical_or.reduce(conditions)]
 
