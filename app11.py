@@ -402,21 +402,21 @@ def autoencoder_anomaly_detection():
             st.download_button(label=T("Download"), data=csv, file_name='autoencoder_anomalies.csv', mime='text/csv')
 
 # --- Rule-based anomaly detection ---
-def rule_based_anomaly_detection():
-    st.header(T("Rule-based Anomaly Detection"))
-    df = st.session_state.data
-    if df is None:
-        st.warning(T("Upload") + " your dataset first.")
-        return
+def rule_based_anomaly_detection(df):
+    # Ensure numeric types
+    df["systolic_bp"] = pd.to_numeric(df["systolic_bp"], errors="coerce")
+    df["diastolic_bp"] = pd.to_numeric(df["diastolic_bp"], errors="coerce")
 
-    st.write("Available columns:", df.columns.tolist())
+    # Drop missing values for comparison
+    df = df.dropna(subset=["systolic_bp", "diastolic_bp"])
 
-    # BPsys normal range 90-120, BPDias normal 60-80
-    conditions = [
-        (df["systolic_bp"] < df["diastolic_bp"])]
+    # Flag anomaly
+    df["bp_anomaly"] = df["systolic_bp"] < df["diastolic_bp"]
 
-    
-    anomalies = df[np.logical_or.reduce(conditions)]
+    # Optionally log or print how many anomalies
+    print(f"Flagged {df['bp_anomaly'].sum()} systolic<diastolic anomalies")
+
+    return df
 
     if anomalies.empty:
         st.info(T("No anomalies"))
