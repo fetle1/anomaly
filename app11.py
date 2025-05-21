@@ -512,7 +512,7 @@ tab_list = [
     T("Preprocessing"),
     T("Standard/Basic"),
     T("Advanced"),
-    T("Rule-based Anomaly Detection")
+    )
 ]
 
 tabs = st.tabs(tab_list)
