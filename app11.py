@@ -149,172 +149,157 @@ def data_overview():
 # --- Preprocessing tab ---
 def preprocessing():
     st.header("Preprocessing")
+
     if not st.session_state.upload_complete:
         st.warning("Please upload data first.")
         return
 
     df = st.session_state.data
-    # [perform your preprocessing steps here...]
+
+    # --- DATA CLEANING ---
     st.subheader(T("Data Cleaning"))
     changes = []
+
     df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
     changes.append("Stripped and standardized column names")
-    
+
     gender_columns = [col for col in df.columns if 'gender' in col]
     for col in gender_columns:
         df.rename(columns={col: 'sex'}, inplace=True)
         changes.append(f"Renamed column '{col}' to 'sex'")
-    
+
     if 'age' not in df.columns:
         age_columns = [col for col in df.columns if 'age' in col]
         if age_columns:
             df.rename(columns={age_columns[0]: 'age'}, inplace=True)
             changes.append(f"Renamed column '{age_columns[0]}' to 'age'")
-    
-    sex_mapping = {
-            'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male',
-            'female': 'female', 'f': 'female', 'woman': 'female', 'girl': 'female',
-            'MALE': 'male', 'Male': 'male', 'FEMALE': 'female', 'Female': 'female'
-        }
-    if 'sex' in df.columns:
-        df['sex'] = df['sex'].astype(str).str.strip().str.lower().map(sex_mapping)
-        changes.append("Mapped values in 'sex' column to standardized format")
-    
-    if 'bp' in df.columns:
-         bp_split = df['bp'].str.extract(r'(?P<systolic_bp>\d{2,3})[^\d]*(?P<diastolic_bp>\d{2,3})')
-         df['systolic_bp'] = pd.to_numeric(bp_split['systolic_bp'], errors='coerce')
-         df['diastolic_bp'] = pd.to_numeric(bp_split['diastolic_bp'], errors='coerce')
-         changes.append("Split 'bp' into 'systolic_bp' and 'diastolic_bp'")
-    
+
     if changes:
-        st.markdown("### ✅ Cleaning Actions Performed:")
+        st.write("✅ Cleaning steps applied:")
         for change in changes:
-           st.write(f"- {change}")
+            st.markdown(f"- {change}")
     else:
         st.info("No automatic cleaning changes were made.")
+
     st.session_state.data = df
-    
-        # --- VARIABLE TYPE CONVERSION ---
+
+    # --- VARIABLE TYPE CONVERSION ---
     st.subheader("🔄 Variable Type Conversion")
-    
     selected_type_col = st.selectbox("Select a column to change its type", df.columns)
     current_dtype = df[selected_type_col].dtype
-    
+
     target_dtype = st.selectbox(
         f"Convert column '{selected_type_col}' from {current_dtype} to:",
-           ["int", "float", "str", "bool", "category"]
-       )
-     st.session_state.data = df
-    
-     if st.button("Apply Type Conversion"):
-         try:
-             df[selected_type_col] = df[selected_type_col].astype(target_dtype)
-             st.success(f"✅ Converted column '{selected_type_col}' to type '{target_dtype}'")
-         except Exception as e:
-             st.error(f"❌ Conversion failed: {e}")
-     st.session_state.data = df
-    
-        # --- DROP COLUMNS ---
-     st.subheader("🗑️ Drop Variables")
-    
-     columns_to_drop = st.multiselect("Select columns to drop from the dataset", df.columns)
-    
-     if columns_to_drop and st.button("Drop Selected Columns"):
-         df.drop(columns=columns_to_drop, inplace=True)
-         st.success(f"✅ Dropped columns: {', '.join(columns_to_drop)}")
-         st.session_state.data = df
-    
-        # --- ENCODING CATEGORICAL VARIABLES ---
-     st.subheader("🔁 Encode Categorical Variables")
-    
-     categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    
-     if categorical_cols:
+        ["int", "float", "str", "bool", "category"]
+    )
+
+    if st.button("Apply Type Conversion"):
+        try:
+            df[selected_type_col] = df[selected_type_col].astype(target_dtype)
+            st.success(f"✅ Converted column '{selected_type_col}' to type '{target_dtype}'")
+        except Exception as e:
+            st.error(f"❌ Conversion failed: {e}")
+
+    st.session_state.data = df
+
+    # --- DROP COLUMNS ---
+    st.subheader("🗑️ Drop Variables")
+    columns_to_drop = st.multiselect("Select columns to drop from the dataset", df.columns)
+
+    if columns_to_drop and st.button("Drop Selected Columns"):
+        df.drop(columns=columns_to_drop, inplace=True)
+        st.success(f"✅ Dropped columns: {', '.join(columns_to_drop)}")
+        st.session_state.data = df
+
+    # --- ENCODING CATEGORICAL VARIABLES ---
+    st.subheader("🔁 Encode Categorical Variables")
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+
+    if categorical_cols:
         selected_col = st.selectbox("Choose a categorical column to encode", categorical_cols)
         encoding_type = st.radio(
             "Select encoding type",
-              ["Label Encoding (Ordinal)", "One-Hot Encoding (Nominal)"]
-           )
-    
-         if encoding_type and st.button("Apply Encoding"):
-         if encoding_type.startswith("Label"):
-             le = LabelEncoder()
-          df[selected_col] = le.fit_transform(df[selected_col].astype(str))
-           st.success(f"✅ Label encoding applied to '{selected_col}'")
-          elif encoding_type.startswith("One-Hot"):
-              df = pd.get_dummies(df, columns=[selected_col], drop_first=True)
-           st.success(f"✅ One-hot encoding applied to '{selected_col}'")
-      st.warning("💡 Use Label Encoding for **ordinal** variables and One-Hot Encoding for **nominal** ones.")
+            ["Label Encoding (Ordinal)", "One-Hot Encoding (Nominal)"]
+        )
+
+        if encoding_type and st.button("Apply Encoding"):
+            if encoding_type.startswith("Label"):
+                le = LabelEncoder()
+                df[selected_col] = le.fit_transform(df[selected_col].astype(str))
+                st.success(f"✅ Label encoding applied to '{selected_col}'")
+            elif encoding_type.startswith("One-Hot"):
+                df = pd.get_dummies(df, columns=[selected_col], drop_first=True)
+                st.success(f"✅ One-hot encoding applied to '{selected_col}'")
+
+        st.warning("💡 Use Label Encoding for **ordinal** variables and One-Hot Encoding for **nominal** ones.")
     else:
-            st.info("No categorical columns found for encoding.")
-    
-        # Update session state with cleaned df
+        st.info("No categorical columns found for encoding.")
+
     st.session_state.data = df
-        
-    
-                # Show missing data
-        st.subheader(T("Missing Data Analysis"))
-        st.write(df.isnull().sum())
-        
-        # Missing data pattern
-        st.markdown("### Missing Data Pattern")
-        msno.matrix(df)
-        st.pyplot(plt.gcf())
-        plt.clf()
-        
-        # Choose variables for statistical test
-        st.subheader(T("Missingness Mechanism Test"))
-        numeric_cols_with_na = [col for col in df.columns if df[col].isnull().sum() > 0 and pd.api.types.is_numeric_dtype(df[col])]
-        
-        selected_cols = st.multiselect("Select columns to test for missingness mechanism", numeric_cols_with_na)
-        
-        if selected_cols:
-            missing_tests = {}
-            for col in selected_cols:
-                group = df[col].isnull()
-                for other_col in df.columns:
-                    if other_col != col and pd.api.types.is_numeric_dtype(df[other_col]):
-                        t_stat, p_value = stats.ttest_ind(df[other_col][group], df[other_col][~group], nan_policy='omit')
-                        if p_value < 0.05:
-                            missing_tests[col] = "Potential MAR/NMAR"
-                            break
-                else:
-                    missing_tests[col] = "Potential MCAR"
-            st.write(missing_tests)
-        
-        # Global imputation method
-        st.subheader(T("Global Missing Data Handling Strategy"))
-        global_method = st.selectbox("Choose a default imputation method for all variables", 
-                                     ["None", "Mean", "Median", "Mode", "KNN", "Drop Row"])
-        
-        # Column-wise imputation
-        st.subheader(T("Imputation per Column"))
-        for col in numeric_cols_with_na:
-            col_method = st.selectbox(f"{T('Imputation method for')} {col}",
-                                      ["Default (Global)", "Mean", "Median", "Mode", "KNN", "Drop Row"],
-                                      key=col)
-            
-            if st.button(f"Apply {col_method} to {col}", key="btn_" + col):
-                method_to_apply = global_method if col_method == "Default (Global)" else col_method
-        
-                if method_to_apply == "Mean" and pd.api.types.is_numeric_dtype(df[col]):
-                    df[col].fillna(df[col].mean(), inplace=True)
-                elif method_to_apply == "Median" and pd.api.types.is_numeric_dtype(df[col]):
-                    df[col].fillna(df[col].median(), inplace=True)
-                elif method_to_apply == "Mode":
-                    df[col].fillna(df[col].mode()[0], inplace=True)
-                elif method_to_apply == "KNN":
-                    knn = KNNImputer()
-                    df[df.columns] = knn.fit_transform(df)
-                elif method_to_apply == "Drop Row":
-                    df.dropna(subset=[col], inplace=True)
-                elif method_to_apply == "None":
-                    pass  # Do nothing
-                st.success(f"{method_to_apply} imputation applied to {col}")
-        
-        # Update session state
-        st.session_state.data = df
-        st.session_state.preprocessing_complete = True
+
+    # --- MISSING DATA ANALYSIS ---
+    st.subheader(T("Missing Data Analysis"))
+    st.write(df.isnull().sum())
+
+    st.markdown("### Missing Data Pattern")
+    msno.matrix(df)
+    st.pyplot(plt.gcf())
+    plt.clf()
+
+    # --- MISSINGNESS MECHANISM TEST ---
+    st.subheader(T("Missingness Mechanism Test"))
+    numeric_cols_with_na = [col for col in df.columns if df[col].isnull().sum() > 0 and pd.api.types.is_numeric_dtype(df[col])]
+
+    selected_cols = st.multiselect("Select columns to test for missingness mechanism", numeric_cols_with_na)
+
+    if selected_cols:
+        missing_tests = {}
+        for col in selected_cols:
+            group = df[col].isnull()
+            for other_col in df.columns:
+                if other_col != col and pd.api.types.is_numeric_dtype(df[other_col]):
+                    t_stat, p_value = stats.ttest_ind(df[other_col][group], df[other_col][~group], nan_policy='omit')
+                    if p_value < 0.05:
+                        missing_tests[col] = "Potential MAR/NMAR"
+                        break
+            else:
+                missing_tests[col] = "Potential MCAR"
+        st.write(missing_tests)
+
+    # --- GLOBAL MISSING DATA STRATEGY ---
+    st.subheader(T("Global Missing Data Handling Strategy"))
+    global_method = st.selectbox("Choose a default imputation method for all variables",
+                                 ["None", "Mean", "Median", "Mode", "KNN", "Drop Row"])
+
+    # --- COLUMN-WISE IMPUTATION ---
+    st.subheader(T("Imputation per Column"))
+    for col in numeric_cols_with_na:
+        col_method = st.selectbox(f"{T('Imputation method for')} {col}",
+                                  ["Default (Global)", "Mean", "Median", "Mode", "KNN", "Drop Row"],
+                                  key=col)
+
+        if st.button(f"Apply {col_method} to {col}", key="btn_" + col):
+            method_to_apply = global_method if col_method == "Default (Global)" else col_method
+
+            if method_to_apply == "Mean" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].mean(), inplace=True)
+            elif method_to_apply == "Median" and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].median(), inplace=True)
+            elif method_to_apply == "Mode":
+                df[col].fillna(df[col].mode()[0], inplace=True)
+            elif method_to_apply == "KNN":
+                knn = KNNImputer()
+                df[df.columns] = knn.fit_transform(df)
+            elif method_to_apply == "Drop Row":
+                df.dropna(subset=[col], inplace=True)
+            elif method_to_apply == "None":
+                pass  # Do nothing
+
+            st.success(f"{method_to_apply} imputation applied to {col}")
+
+    st.session_state.data = df
+    st.session_state.preprocessing_complete = True
+
 
 # --- Basic anomaly detection ---
 def basic_anomaly_detection():
