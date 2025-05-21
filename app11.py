@@ -418,15 +418,7 @@ def rule_based_anomaly_detection(df):
 
     return df
 
-    if anomalies.empty:
-        st.info(T("No anomalies"))
-    else:
-        st.write(T("Detected anomalies:"))
-        st.dataframe(anomalies)
-        if st.button(T("Download") + " CSV - Rule Based Anomalies"):
-            csv = anomalies.to_csv(index=False).encode()
-            st.download_button(label=T("Download"), data=csv, file_name='rule_based_anomalies.csv', mime='text/csv')
-
+   
 # --- Main tabs ---
 tab_list = [
     T("Upload"),
