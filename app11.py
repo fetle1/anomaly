@@ -153,7 +153,15 @@ def preprocessing():
         return
     st.subheader(T("Data Cleaning"))
     df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
-
+    gender_columns = [col for col in df.columns if 'gender' in col]
+    for col in gender_columns:
+        df.rename(columns={col: 'sex'}, inplace=True)
+        changes.append(f"Renamed column '{col}' to 'sex'")
+    if 'age' not in df.columns:
+        age_columns = [col for col in df.columns if 'age' in col]
+        if age_columns:
+            df.rename(columns={age_columns[0]: 'age'}, inplace=True)
+            changes.append(f"Renamed column '{age_columns[0]}' to 'age'")
 # Map sex to standardized values
     sex_mapping = {
         'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male', 'MALE': 'male', 'Male': 'male',
