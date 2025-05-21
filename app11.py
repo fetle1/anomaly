@@ -192,6 +192,7 @@ def preprocessing():
             st.write(f"- {change}")
     else:
         st.info("No automatic cleaning changes were made.")
+    st.session_state.data = df
 
     # --- VARIABLE TYPE CONVERSION ---
     st.subheader("🔄 Variable Type Conversion")
@@ -203,6 +204,7 @@ def preprocessing():
         f"Convert column '{selected_type_col}' from {current_dtype} to:",
         ["int", "float", "str", "bool", "category"]
     )
+    st.session_state.data = df
 
     if st.button("Apply Type Conversion"):
         try:
@@ -210,6 +212,7 @@ def preprocessing():
             st.success(f"✅ Converted column '{selected_type_col}' to type '{target_dtype}'")
         except Exception as e:
             st.error(f"❌ Conversion failed: {e}")
+    st.session_state.data = df
 
     # --- DROP COLUMNS ---
     st.subheader("🗑️ Drop Variables")
@@ -219,6 +222,7 @@ def preprocessing():
     if columns_to_drop and st.button("Drop Selected Columns"):
         df.drop(columns=columns_to_drop, inplace=True)
         st.success(f"✅ Dropped columns: {', '.join(columns_to_drop)}")
+    st.session_state.data = df
 
     # --- ENCODING CATEGORICAL VARIABLES ---
     st.subheader("🔁 Encode Categorical Variables")
@@ -273,6 +277,7 @@ def preprocessing():
             else:
                 missing_tests[col] = "Potential MCAR"
     st.write(missing_tests)
+    st.session_state.data = df
 
     # Column-wise imputation UI
     st.subheader(T("Imputation per Column"))
@@ -404,7 +409,7 @@ def autoencoder_anomaly_detection():
 # --- Rule-based anomaly detection ---
 def rule_based_anomaly_detection(df):
     # Ensure numeric types
-    st.session_state.data = df
+    df =  st.session_state.data 
     df["systolic_bp"] = pd.to_numeric(df["systolic_bp"], errors="coerce")
     df["diastolic_bp"] = pd.to_numeric(df["diastolic_bp"], errors="coerce")
 
@@ -416,6 +421,8 @@ def rule_based_anomaly_detection(df):
 
     # Optionally log or print how many anomalies
     print(f"Flagged {df['bp_anomaly'].sum()} systolic<diastolic anomalies")
+    st.write(f"🔎 Found {df['bp_anomaly'].sum()} BP anomalies")
+    st.dataframe(df[df["bp_anomaly"]])
 
     return df
 
