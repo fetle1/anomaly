@@ -156,43 +156,43 @@ def preprocessing():
     df = st.session_state.data
     # [perform your preprocessing steps here...]
     st.subheader(T("Data Cleaning"))
-     changes = []
-     df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
-     changes.append("Stripped and standardized column names")
+    changes = []
+    df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+    changes.append("Stripped and standardized column names")
     
-        gender_columns = [col for col in df.columns if 'gender' in col]
-        for col in gender_columns:
-            df.rename(columns={col: 'sex'}, inplace=True)
-            changes.append(f"Renamed column '{col}' to 'sex'")
+    gender_columns = [col for col in df.columns if 'gender' in col]
+    for col in gender_columns:
+        df.rename(columns={col: 'sex'}, inplace=True)
+        changes.append(f"Renamed column '{col}' to 'sex'")
     
-        if 'age' not in df.columns:
-            age_columns = [col for col in df.columns if 'age' in col]
-            if age_columns:
-                df.rename(columns={age_columns[0]: 'age'}, inplace=True)
-                changes.append(f"Renamed column '{age_columns[0]}' to 'age'")
+    if 'age' not in df.columns:
+        age_columns = [col for col in df.columns if 'age' in col]
+        if age_columns:
+            df.rename(columns={age_columns[0]: 'age'}, inplace=True)
+            changes.append(f"Renamed column '{age_columns[0]}' to 'age'")
     
-        sex_mapping = {
+    sex_mapping = {
             'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male',
             'female': 'female', 'f': 'female', 'woman': 'female', 'girl': 'female',
             'MALE': 'male', 'Male': 'male', 'FEMALE': 'female', 'Female': 'female'
         }
-        if 'sex' in df.columns:
-            df['sex'] = df['sex'].astype(str).str.strip().str.lower().map(sex_mapping)
-            changes.append("Mapped values in 'sex' column to standardized format")
+    if 'sex' in df.columns:
+        df['sex'] = df['sex'].astype(str).str.strip().str.lower().map(sex_mapping)
+        changes.append("Mapped values in 'sex' column to standardized format")
     
-        if 'bp' in df.columns:
-            bp_split = df['bp'].str.extract(r'(?P<systolic_bp>\d{2,3})[^\d]*(?P<diastolic_bp>\d{2,3})')
-            df['systolic_bp'] = pd.to_numeric(bp_split['systolic_bp'], errors='coerce')
-            df['diastolic_bp'] = pd.to_numeric(bp_split['diastolic_bp'], errors='coerce')
-            changes.append("Split 'bp' into 'systolic_bp' and 'diastolic_bp'")
+    if 'bp' in df.columns:
+         bp_split = df['bp'].str.extract(r'(?P<systolic_bp>\d{2,3})[^\d]*(?P<diastolic_bp>\d{2,3})')
+         df['systolic_bp'] = pd.to_numeric(bp_split['systolic_bp'], errors='coerce')
+         df['diastolic_bp'] = pd.to_numeric(bp_split['diastolic_bp'], errors='coerce')
+         changes.append("Split 'bp' into 'systolic_bp' and 'diastolic_bp'")
     
-        if changes:
-            st.markdown("### ✅ Cleaning Actions Performed:")
-            for change in changes:
-                st.write(f"- {change}")
+    if changes:
+         st.markdown("### ✅ Cleaning Actions Performed:")
+         for change in changes:
+             st.write(f"- {change}")
         else:
             st.info("No automatic cleaning changes were made.")
-        st.session_state.data = df
+    st.session_state.data = df
     
         # --- VARIABLE TYPE CONVERSION ---
         st.subheader("🔄 Variable Type Conversion")
