@@ -231,7 +231,7 @@ def set_background_and_logo(logo_path=None, background_image_path=None):
         page_bg_img = f"""
         <style>
         .stApp {{
-            background-image: url("data:image/png;base64,{b64_bg}");
+            background-image: url("https://www.rgare.com/images/default-source/knowledge-center/kc-banner/digital-health-meir-030123.png?sfvrsn=5a735122_2;base64,{b64_bg}");
             background-size: cover;
             background-position: center;
         }}
@@ -254,7 +254,7 @@ def main():
 
     set_background_and_logo(logo_path, bg_path)
 
-    tabs = st.tabs(["Home", "Upload", "Preprocessing", "Data Overview", "Missing Analysis", "Anomaly Detection"])
+    tabs = st.tabs(["Home", "Upload", "Preprocessing","Missing Analysis","Data Overview", "Anomaly Detection"])
 
     with tabs[0]:
         st.title("Clinical Data Explorer")
