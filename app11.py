@@ -151,30 +151,38 @@ def preprocessing():
     if df is None:
         st.warning(T("Upload") + " your dataset first.")
         return
+
     st.subheader(T("Data Cleaning"))
     df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
-    gender_columns = [col for col in df.columns if 'gender' in col]
-    for col in gender_columns:
-        df.rename(columns={col: 'sex'}, inplace=True)
-        changes.append(f"Renamed column '{col}' to 'sex'")
+    
+    # Rename sex/gender columns
+    gender_columns = [col for col in df.columns if 'sex' in col or 'gender' in col]
+    if gender_columns:
+        df.rename(columns={gender_columns[0]: 'sex'}, inplace=True)
+        changes.append(f"Renamed column '{gender_columns[0]}' to 'sex'")
+
+    # Standardize age column
     if 'age' not in df.columns:
         age_columns = [col for col in df.columns if 'age' in col]
         if age_columns:
             df.rename(columns={age_columns[0]: 'age'}, inplace=True)
             changes.append(f"Renamed column '{age_columns[0]}' to 'age'")
-# Map sex to standardized values
+
+    # Normalize and map sex values
     sex_mapping = {
-        'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male', 'MALE': 'male', 'Male': 'male',
-        'female': 'female', 'f': 'female', 'woman': 'female', 'girl': 'female', 'FEMALE': 'female', 'Female': 'female'
+        'male': 'male', 'm': 'male', 'man': 'male', 'boy': 'male',
+        'female': 'female', 'f': 'female', 'woman': 'female', 'girl': 'female'
     }
-    df['sex'] = df['sex'].str.strip().str.lower().map(sex_mapping)
-    
-    # Split blood pressure column if it exists
+    if 'sex' in df.columns:
+        df['sex'] = df['sex'].astype(str).str.strip().str.lower().map(sex_mapping)
+
+    # Split blood pressure into systolic and diastolic
     if 'bp' in df.columns:
-        bp_split = df['bp'].str.extract(r'(?P<systolic_bp>\d{2,3})[^\d]*(?P<diastolic_bp>\d{2,3})')
+        bp_split = df['bp'].astype(str).str.extract(r'(?P<systolic_bp>\d{2,3})[^\d]+(?P<diastolic_bp>\d{2,3})')
         df['systolic_bp'] = pd.to_numeric(bp_split['systolic_bp'], errors='coerce')
         df['diastolic_bp'] = pd.to_numeric(bp_split['diastolic_bp'], errors='coerce')
 
+    # Show missing data
     st.subheader(T("Missing Data Analysis"))
     st.write(df.isnull().sum())
 
@@ -183,6 +191,7 @@ def preprocessing():
     st.pyplot(plt.gcf())
     plt.clf()
 
+    # Statistical test for MCAR vs MAR/NMAR
     st.subheader(T("Statistical Tests for Missingness Type"))
     missing_tests = {}
     for col in df.columns:
@@ -198,6 +207,7 @@ def preprocessing():
                 missing_tests[col] = "Potential MCAR"
     st.write(missing_tests)
 
+    # Column-wise imputation UI
     st.subheader(T("Imputation per Column"))
     for col in df.columns:
         if df[col].isnull().sum() > 0:
